@@ -1,0 +1,25 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+import Base from '../layouts/Base.astro';
+import Home from '../components/Home.astro';
+import { REPO } from '../consts';
+---
+<Base
+	title="radiusward — open-source RADIUS server: network logins and usage records that survive a server failure"
+	description="radiusward is an open-source RADIUS server for Wi‑Fi, VPN and subscriber networks: logins against your users file, SQL or Active Directory, and session records stored on three servers before they are confirmed — so a crash never loses or double-counts a record."
+	section="home"
+	jsonld={[
+		{
+			'@type': 'SoftwareSourceCode',
+			name: 'radiusward',
+			description: 'Open-source RADIUS server in Java: accounting acknowledged only after a majority commit, authentication with PAP, CHAP, MS-CHAP and EAP, RadSec, DTLS, proxying and CoA.',
+			codeRepository: REPO,
+			programmingLanguage: 'Java',
+			license: 'https://www.apache.org/licenses/LICENSE-2.0',
+			url: 'https://radiusward.io/',
+		},
+	]}
+>
+	<div class="container"><Home /></div>
+</Base>

@@ -1,0 +1,44 @@
+---
+title: "Roadmap"
+description: "What radiusward has done so far, what comes next, what is being evaluated, and what is not planned."
+source: "docs/plans/roadmap.md"
+---
+
+radiusward was built in phases, each with a plan and a report in the server repository. The first release candidate,
+`v0.1.0-rc.1`, was tagged in November 2026.
+
+## Done
+
+| | |
+|---|---|
+| **Accounting core** | the RADIUS codec, bundled vendor dictionaries, the replicated cluster with per-session deduplication and snapshots, gateways, a test client |
+| **Containers and failover** | one image, the Compose stack, a leader replaced in about 2 seconds without NAS retransmissions, fault injection with power loss, partitions, full disks and overload |
+| **Export** | the exporter tailing the committed log, PostgreSQL and JSON-lines sinks, forwarding to other RADIUS servers, lag policy, log purge, metrics |
+| **Deployment** | the Helm chart with nightly chaos tests, systemd units, dashboards and alert rules, seeding of a replaced member, a continuous backup with restore after a lost quorum, example templates for Amazon ECS |
+| **Authentication** | PAP, CHAP, MS-CHAP, EAP-TLS, PEAP, TTLS, TEAP, EAP-pwd, EAP-SIM/AKA/AKA′ with local keys; users file, SQL, LDAP/Active Directory, Netlogon; policy, Simultaneous-Use through the cluster, address pools, TOTP; RadSec, DTLS, TCP; proxying; CoA and Disconnect |
+| **Evidence** | published test reports with history, weekly benchmarks with published pages |
+
+## Next
+
+- **A stable 0.1.0 release**, after the release candidate has been exercised.
+- **More export destinations**: further relational databases and a message stream, behind the same sink interface.
+- **Benchmarks on dedicated machines** (Amazon ECS, per profile), so the ceilings per profile are measured rather
+  than bounded from below.
+- **This website**: the first version is being completed; the reference documentation will be imported from the
+  server repository at each release.
+
+## Being evaluated
+
+- Interoperability with real NAS devices and supplicants, and packet captures to replace the synthetic fixtures.
+- A test against a Windows domain controller for the Netlogon verifier, which so far is tested against Samba AD.
+- Federated roaming (campus and research networks): the requirements, a lab realm, and what is missing.
+
+## Not planned
+
+- **PEAPv1** — until a user with clients that need it asks.
+- **SIM algorithms other than Milenage**, such as COMP128.
+- **argon2** password hashes.
+- **A hosted service.** radiusward is software you run; a managed offering is not on the roadmap.
+
+The phase plans and reports, with every decision and measurement:
+<a href="https://github.com/radiusward/radiusward-server/blob/main/docs/plans/roadmap.md">roadmap.md ↗</a>.

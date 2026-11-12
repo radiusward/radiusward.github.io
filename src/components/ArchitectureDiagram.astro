@@ -1,0 +1,106 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+// The two request paths, drawn with HTML so it scales, reads in both themes and stays text for screen readers.
+---
+<figure class="arch" aria-labelledby="arch-caption">
+	<div class="arch-head"><strong>Two request paths</strong><span>conceptual</span></div>
+
+	<div class="node"><strong>Network devices</strong><small>NAS · access points · switches · BNG</small></div>
+	<div class="link" aria-hidden="true">↓ UDP · RadSec · DTLS · TCP</div>
+
+	<div class="row two">
+		<div class="node"><strong>Gateway A</strong><small>validate · authenticate</small></div>
+		<div class="node"><strong>Gateway B</strong><small>validate · authenticate</small></div>
+	</div>
+
+	<div class="row split">
+		<div class="path">
+			<div class="link" aria-hidden="true">↙ authentication</div>
+			<div class="node plain"><strong>Identity stores</strong><small>users file · SQL · LDAP/AD · Netlogon · home servers</small></div>
+			<p class="note">Decided on the gateway; keeps working without a cluster majority, except shared-state features.</p>
+		</div>
+		<div class="path">
+			<div class="link" aria-hidden="true">↘ accounting</div>
+			<div class="cluster">
+				<div class="cluster-head"><strong>Replicated log</strong><span>3 members</span></div>
+				<div class="row three">
+					<div class="node"><strong>Member 1</strong></div>
+					<div class="node"><strong>Member 2</strong></div>
+					<div class="node"><strong>Member 3</strong></div>
+				</div>
+				<p class="note">fsync on a majority, then the Accounting-Response.</p>
+			</div>
+			<div class="link" aria-hidden="true">↓ committed records</div>
+			<div class="node plain"><strong>Exports</strong><small>PostgreSQL · JSON lines · RADIUS forwarding</small></div>
+		</div>
+	</div>
+
+	<figcaption id="arch-caption">
+		Accounting is answered only after the commit; delivery to an export is a separate, later step.{' '}
+		<a href="/docs/reliability/accounting-contract/">Read the contract →</a>
+	</figcaption>
+</figure>
+
+<style>
+	.arch {
+		margin: 0;
+		padding: 1.25rem;
+		border: 1px solid var(--color-border);
+		border-radius: 1rem;
+		background: var(--color-surface);
+		box-shadow: 0 20px 50px rgb(40 37 29 / 0.06);
+		font-size: 0.9rem;
+	}
+	.arch-head, .cluster-head {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 0.9rem;
+		font-size: 0.78rem;
+		color: var(--color-text-faint);
+	}
+	.arch-head strong { color: var(--color-text); }
+	.cluster-head { color: var(--color-primary); margin-bottom: 0.6rem; }
+	.node {
+		padding: 0.6rem 0.75rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.4rem;
+		background: var(--color-bg);
+		text-align: center;
+	}
+	.node strong { display: block; color: var(--color-text); font-size: 0.86rem; }
+	.node small { display: block; margin-top: 0.15rem; color: var(--color-text-faint); font-size: 0.74rem; line-height: 1.35; }
+	.plain { background: var(--color-surface-2); }
+	.row { display: grid; gap: 0.6rem; }
+	.two { grid-template-columns: 1fr 1fr; }
+	.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.split { grid-template-columns: 1fr 1.35fr; align-items: start; gap: 0.9rem; }
+	.link {
+		display: grid;
+		place-items: center;
+		min-height: 2rem;
+		color: var(--color-text-faint);
+		font-family: var(--font-code);
+		font-size: 0.74rem;
+	}
+	.cluster {
+		padding: 0.75rem;
+		border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+		border-radius: 0.6rem;
+		background: var(--color-primary-tint);
+	}
+	.cluster .node { background: var(--color-surface); padding: 0.45rem 0.3rem; }
+	.note { margin: 0.5rem 0 0; color: var(--color-text-faint); font-size: 0.74rem; line-height: 1.4; }
+	figcaption {
+		margin-top: 1rem;
+		padding-top: 0.8rem;
+		border-top: 1px solid var(--color-divider);
+		color: var(--color-text-faint);
+		font-size: 0.78rem;
+	}
+	figcaption a { color: var(--color-primary); }
+	@media (max-width: 30rem) {
+		.split { grid-template-columns: 1fr; }
+	}
+</style>

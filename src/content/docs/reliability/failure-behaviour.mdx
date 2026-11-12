@@ -1,0 +1,31 @@
+---
+title: "Failure behaviour"
+description: "Leader failure, gateway failure, loss of the majority, a sink outage, a lost disk and a lost quorum: what pauses, what retries, what recovers, and what each assumes."
+source: "docs/testing/failure-matrix.md"
+---
+
+import ScenarioList from '../../../components/ScenarioList.astro';
+
+What a NAS and an operator see when part of radiusward fails. Each scenario states what to expect, what it assumes,
+how it recovers, where it ends, and which test checks it. The rule behind all of them is the
+[accounting contract](/docs/reliability/accounting-contract/): **nothing is acknowledged before it is safe on a
+majority, and nothing acknowledged is lost while a majority survives.**
+
+<Callout type="note" title="Two kinds of pause">
+A NAS waits briefly during a leader election, and indefinitely while no majority exists — in both cases it keeps the
+records and retries, which is what RADIUS clients are built to do. What it never sees is an acknowledgement for a
+record that is later lost.
+</Callout>
+
+The scenarios: [the leader is killed](#leader) · [a gateway fails](#gateway) · [the majority is lost](#majority) ·
+[a sink is down](#sink) · [a server loses its disk](#disk) · [two servers are lost](#quorum).
+
+<ScenarioList />
+
+## Not covered
+
+- **Two members lost at once with their disks**, and no backup: the cluster cannot be restored. Run the continuous
+  backup.
+- **Storage that ignores fsync** (some virtual disks, or caches without power-loss protection) voids the durability
+  guarantee; it is tested on Linux, not on macOS.
+- **Members on high-latency links** do not lose data, but every acknowledgement waits for the round trip.

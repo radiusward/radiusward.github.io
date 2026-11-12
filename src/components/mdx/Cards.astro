@@ -1,0 +1,8 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+---
+<div class="cards"><slot /></div>
+<style>
+	.cards { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+</style>

@@ -1,0 +1,155 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+// The product page: one level deeper than the home, organised by what the reader wants to do.
+import Base from '../layouts/Base.astro';
+import { REPO } from '../consts';
+const DOCS = `${REPO}/blob/main/docs`;
+---
+<Base title="Product" description="What radiusward does for a network: lets users and devices on with the credentials you already have, keeps every session record through outages and failovers, delivers the records to your database, and runs where your other services run." section="product">
+	<div class="container">
+		<section class="page-hero">
+			<span class="eyebrow">The product</span>
+			<h1>One RADIUS server for logins, usage records, and the day a server dies.</h1>
+			<p>
+				radiusward is the RADIUS server your access points, switches, VPN concentrators and broadband gateways talk
+				to. It decides who may connect, keeps a record of every session, and keeps doing both when one of its
+				servers fails.
+			</p>
+			<div class="actions">
+				<a class="btn btn-primary" href="/docs/start/quickstart/">Try it in 10 minutes →</a>
+				<a class="btn" href="/docs/concepts/architecture/">How it is built</a>
+			</div>
+		</section>
+
+		<nav class="tabs" aria-label="On this page">
+			<a href="#logins">Logins</a><a href="#records">Session records</a><a href="#operate">Running it</a><a href="#deployment">Where it runs</a><a href="#fit">Is it a fit?</a>
+		</nav>
+
+		<section class="split" id="logins">
+			<div>
+				<span class="eyebrow">Let users and devices on</span>
+				<h2>With the credentials you already have.</h2>
+				<p>Wi‑Fi and wired 802.1X, VPN, subscriber logins and captive portals — against your users file, SQL database, LDAP directory or Active Directory. No new user store to maintain.</p>
+			</div>
+			<dl>
+				<div><dt>Certificates</dt><dd>EAP‑TLS for managed laptops and phones; PEAP, TTLS and TEAP with a certificate inside; client certificates checked against your CA, with CRL and OCSP revocation.</dd></div>
+				<div><dt>Passwords</dt><dd>PAP, CHAP and MS‑CHAP over UDP; PEAP, TTLS, TEAP and EAP‑pwd for 802.1X. Passwords stored as cleartext, NT hashes, bcrypt, SHA‑crypt, yescrypt, PBKDF2 or salted SHA — and radiusward tells you which method each format allows.</dd></div>
+				<div><dt>Active Directory</dt><dd>PAP by LDAP bind, or MS‑CHAPv2 and PAP over Netlogon in pure Java — no Samba, no domain join on the server. Group membership, nested groups and per‑group policies.</dd></div>
+				<div><dt>SIM cards</dt><dd>EAP‑SIM, EAP‑AKA and EAP‑AKA′ for private LTE/5G networks that hold their own subscriber keys; pseudonyms and fast re‑authentication.</dd></div>
+				<div><dt>Policy</dt><dd>Reply attributes per user and group, a device limit per user that holds across all servers (Simultaneous‑Use), login hours, expiry, usage counters, IPv4 and IPv6 address pools, a second factor with TOTP, a small rules language for the final decision.</dd></div>
+				<div><dt>Roaming and control</dt><dd>Realms forwarded to other RADIUS servers with failover and discovery; Change‑of‑Authorization and Disconnect to the device through an HTTP API; RadSec and DTLS where the network is not trusted.</dd></div>
+			</dl>
+		</section>
+
+		<section class="split" id="records">
+			<div>
+				<span class="eyebrow">Keep every session record</span>
+				<h2>Confirmed only once it is safe.</h2>
+				<p>A device's Start, Interim and Stop records are the usage you bill and the answer to "who had this address at 14:05". radiusward treats them accordingly.</p>
+			</div>
+			<dl>
+				<div><dt>Stored on three servers first</dt><dd>A record is confirmed to the device only after it is written to disk on two of the three cluster servers. A crash — even a power loss — of any one of them loses nothing that was confirmed.</dd></div>
+				<div><dt>Counted once</dt><dd>A device that retries, after a timeout or a failover, through either gateway, gets the same answer and the session is counted once. The rules are precise enough to be tested, and they are.</dd></div>
+				<div><dt>Whole sessions</dt><dd>Start and Stop land in the same replicated state wherever they arrived; a lost Stop is closed by an idle timeout at the session's last record; a device restart (Accounting‑On/Off) closes its sessions.</dd></div>
+				<div><dt>Delivered to your database</dt><dd>PostgreSQL — one row per session in the column layout billing tools expect, optionally the full event history — JSON‑lines files, or forwarded to another RADIUS server. Written after the confirmation, exactly once, and buffered by the log while the database is down.</dd></div>
+				<div><dt>Stated, not implied</dt><dd>What a confirmation guarantees, when radiusward stays silent, and where the guarantee ends are written down and tested: <a href="/docs/reliability/accounting-contract/">the accounting contract</a>.</dd></div>
+			</dl>
+		</section>
+
+		<section class="split" id="operate">
+			<div>
+				<span class="eyebrow">Run it like your other services</span>
+				<h2>Built to be operated, not only installed.</h2>
+				<p>Three cluster servers and two or more gateways. What that costs you, and what it gives you back.</p>
+			</div>
+			<dl>
+				<div><dt>Failover in seconds</dt><dd>A failed leader is replaced in about two seconds — within a device's retry window, so logins and records continue without anyone noticing.</dd></div>
+				<div><dt>Metrics, dashboards, alerts</dt><dd>Prometheus metrics on every process, five Grafana dashboards and alert rules that ship with the Helm chart: no leader, export lag, a disk filling up, the backup behind, a certificate about to expire.</dd></div>
+				<div><dt>Recovery built in</dt><dd>A server that lost its disk copies the state from the others and rejoins on its own. A continuous backup outside the cluster restores a cluster that lost two servers at once.</dd></div>
+				<div><dt>Upgrades without downtime</dt><dd>Servers restart one at a time while the cluster keeps its quorum; changes to how records are applied take effect only once every server runs the new version.</dd></div>
+				<div><dt>When things go wrong</dt><dd>Per‑request traces for a user or a device, an authentication log with the reason for every decision, configuration reload without a restart.</dd></div>
+			</dl>
+		</section>
+
+		<section class="split" id="deployment">
+			<div>
+				<span class="eyebrow">Where it runs</span>
+				<h2>Start on a laptop. Deploy where your services are.</h2>
+				<p>One container image for amd64 and arm64, public, non‑root, with an SBOM. Java 25 inside; nothing else to install.</p>
+			</div>
+			<div class="deploy">
+				<a href="/docs/deployment/docker/"><h3>Docker</h3><p>A complete cluster with Docker Compose in one command — the quickstart.</p></a>
+				<a href="/docs/deployment/kubernetes/"><h3>Kubernetes</h3><p>The Helm chart: members with their own volumes, gateways with their own addresses, the backup, dashboards and alerts. Tested nightly under failures.</p></a>
+				<a href={`${DOCS}/operations/bare-metal.md`}><h3>Hosts with systemd ↗</h3><p>Units for the members, the gateways and the backup, for machines without containers.</p></a>
+				<a href={`${DOCS}/operations/aws-ecs.md`}><h3>Amazon ECS ↗</h3><p>Example CloudFormation and Terraform templates on Graviton — validated, not yet deployed by the project.</p></a>
+			</div>
+		</section>
+
+		<section class="split" id="fit">
+			<div>
+				<span class="eyebrow">Is it a fit?</span>
+				<h2>Choose the architecture, not the longest feature list.</h2>
+			</div>
+			<div>
+				<h3>Worth evaluating when</h3>
+				<ul>
+					<li>losing session records on a crash is not acceptable — they feed billing, usage limits or compliance;</li>
+					<li>you want to read what the server guarantees and check it before relying on it;</li>
+					<li>your team can run and monitor a three-server service, or already runs Kubernetes.</li>
+				</ul>
+				<h3>Evaluate carefully when</h3>
+				<ul>
+					<li>you need the simplest possible single-server installation;</li>
+					<li>you depend on another RADIUS server's modules or configuration format — radiusward is not compatible with them;</li>
+					<li>you need device certifications or a support contract today.</li>
+				</ul>
+				<p class="note"><strong>What it is not.</strong> Not a hosted service; not certified by any device vendor; not yet independently audited. Interoperability is tested against software clients and servers, not named hardware.</p>
+				<a class="more" href="/docs/start/fit/">The trade-offs in detail →</a>
+			</div>
+		</section>
+
+		<section class="next">
+			<span class="eyebrow">Next step</span>
+			<h2>See what it does in your environment.</h2>
+			<div class="actions">
+				<a class="btn btn-primary" href="/docs/start/quickstart/">Try it in 10 minutes →</a>
+				<a class="btn" href="/reliability/">See how it fails — and recovers</a>
+			</div>
+		</section>
+	</div>
+</Base>
+<style>
+	.page-hero { padding-block: var(--space-16) var(--space-10); max-width: 860px; }
+	.page-hero h1 { font-size: var(--text-2xl); letter-spacing: -0.05em; max-width: 24ch; }
+	.page-hero p { margin-top: var(--space-5); max-width: 62ch; color: var(--color-text-muted); }
+	.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-8); }
+	.tabs { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-bottom: var(--space-6); border-bottom: 1px solid var(--color-divider); }
+	.tabs a { padding: var(--space-2) var(--space-4); border: 1px solid var(--color-border); border-radius: 999rem; font-size: var(--text-sm); }
+	.tabs a:hover { background: var(--color-primary-tint); }
+	.split { display: grid; grid-template-columns: 0.8fr 1.6fr; gap: var(--space-16); padding-block: var(--space-16); border-bottom: 1px solid var(--color-divider); }
+	.split h2 { font-size: var(--text-xl); }
+	.split > div > p { margin-top: var(--space-5); color: var(--color-text-muted); }
+	dl > div { display: grid; grid-template-columns: 170px 1fr; gap: var(--space-6); padding-block: var(--space-5); border-bottom: 1px solid var(--color-divider); }
+	dl > div:first-child { padding-top: 0; }
+	dl > div:last-child { border-bottom: 0; }
+	dt { font-weight: 700; font-size: var(--text-sm); }
+	dd { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
+	dd a { color: var(--color-primary); font-weight: 700; }
+	.deploy { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+	.deploy a { padding: var(--space-6); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+	.deploy a:hover { border-color: var(--color-primary); }
+	.deploy h3 { font-size: var(--text-lg); }
+	.deploy p { margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+	#fit h3 { font-size: var(--text-base); margin-top: var(--space-6); }
+	#fit h3:first-child { margin-top: 0; }
+	#fit ul { margin-top: var(--space-3); padding-left: var(--space-5); color: var(--color-text-muted); }
+	#fit li + li { margin-top: var(--space-2); }
+	.note { margin-top: var(--space-8); padding: var(--space-4) var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+	.note strong { color: var(--color-text); }
+	.more { display: inline-block; margin-top: var(--space-6); color: var(--color-primary); font-weight: 700; font-size: var(--text-sm); }
+	.next { padding-block: var(--space-16); }
+	.next h2 { font-size: var(--text-xl); max-width: 24ch; }
+	@media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: var(--space-6); padding-block: var(--space-10); } }
+	@media (max-width: 520px) { .deploy { grid-template-columns: 1fr; } dl > div { grid-template-columns: 1fr; gap: var(--space-2); } }
+</style>

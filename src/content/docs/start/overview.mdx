@@ -1,0 +1,61 @@
+---
+title: "What radiusward is"
+description: "An open-source RADIUS server in Java whose accounting is replicated: an Accounting-Response goes out only after the record is stored on a majority of a three-member cluster."
+source: "README.md"
+---
+
+radiusward is a RADIUS server — the service that network equipment asks whether a user or device may connect
+(authentication) and tells about the sessions it carries (accounting). Access points, switches, broadband gateways,
+VPN concentrators and mobile core functions all speak RADIUS. Their name in RADIUS is **NAS**, network access server.
+
+What sets radiusward apart is what happens to accounting.
+
+## Accounting that survives a node
+
+A NAS reports every session with Accounting-Requests: a Start, Interim updates while it runs, a Stop at the end.
+Those records are what billing, usage limits and audits are built on. radiusward answers such a request only after
+the record has been **written to disk on two of three cluster members**. If any one member crashes — even loses
+power — nothing that was acknowledged is lost, and the NAS, which retries until it gets an answer, never has to be
+told twice. Retries that arrive after a failover, or through the other gateway, are recognised and counted once.
+
+The exact promise, its assumptions and its limits are in [the accounting contract](/docs/reliability/accounting-contract/).
+
+## Authentication on the gateways
+
+Access-Requests are decided by the **gateways**, the processes that hold the network sockets, from identity stores
+you already have: a users file, SQL, LDAP or Active Directory, or Active Directory over Netlogon. radiusward speaks
+PAP, CHAP, MS-CHAP and the EAP methods used for Wi-Fi and wired 802.1X — EAP-TLS, PEAP, TTLS, TEAP, EAP-pwd — and
+EAP-SIM, EAP-AKA and EAP-AKA′ for SIM cards. Only the state that every gateway must agree on — how many devices a user
+has online, SIM sequence numbers — goes through the cluster.
+
+It carries RADIUS over UDP, TLS (RadSec), DTLS and TCP; forwards realms to other RADIUS servers (proxying); and sends
+Change-of-Authorization and Disconnect requests to the NAS.
+
+## How it runs
+
+<Cards>
+	<Card title="Three cluster members">
+		Hold the replicated accounting log and its state, built on Aeron Cluster with Raft consensus. Each also exports
+		the committed records to PostgreSQL, JSON-lines files or other RADIUS servers.
+	</Card>
+	<Card title="Two or more gateways">
+		Hold the sockets, check every packet, decide authentication, forward accounting to the cluster and answer after
+		the commit. They keep no state of their own that matters.
+	</Card>
+	<Card title="Where it runs">
+		A container image for amd64 and arm64; a Helm chart for Kubernetes; systemd units for hosts; example templates for
+		Amazon ECS. Java 25.
+	</Card>
+</Cards>
+
+## Who it is for
+
+radiusward is for operators whose accounting records matter — internet providers, campus and enterprise networks,
+private mobile networks — and who want to read what a RADIUS server guarantees, and check it, before relying on it.
+[Is it a fit?](/docs/start/fit/) lists when it is, and when something simpler serves better.
+
+## Status
+
+radiusward is open source under the Apache-2.0 licence and young: the first release candidate, `v0.1.0-rc.1`, came out
+in November 2026. Its behaviour under failures is tested automatically and published; it does not yet have a
+production track record, device certifications or an independent security audit.

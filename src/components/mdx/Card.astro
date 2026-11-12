@@ -1,0 +1,16 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+interface Props { title: string; href?: string; }
+const { title, href } = Astro.props;
+const Tag = href ? 'a' : 'div';
+---
+<Tag class:list={['card', { link: href }]} href={href}>
+	<strong>{title}{href && <span aria-hidden="true"> →</span>}</strong>
+	<div><slot /></div>
+</Tag>
+<style>
+	.card { display: block; margin: 0 !important; padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: var(--text-sm); color: var(--color-text-muted); }
+	.card.link:hover { border-color: var(--color-primary); }
+	strong { display: block; margin-bottom: var(--space-2); color: var(--color-text); font-size: var(--text-base); }
+</style>

@@ -1,0 +1,24 @@
+{
+  "name": "radiusward-site",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist && node scripts/check-site.mjs",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "node scripts/check-site.mjs"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "8.1.5",
+    "@astrojs/sitemap": "3.7.4",
+    "astro": "7.4.11"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "pagefind": "1.6.0"
+  }
+}

@@ -1,0 +1,99 @@
+---
+title: "Docker"
+description: "The container image and the Docker Compose stack: three members, two gateways and PostgreSQL; memory profiles; what to know about addresses, /dev/shm, data and fsync; the backup and monitoring profiles."
+source: "docs/operations/docker.md"
+---
+
+## The image
+
+One image for every component — members, gateways, backup and the tools:
+
+```text
+ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+```
+
+It is public, built for amd64 and arm64, runs as a non-root user, and ships with an SBOM and build provenance.
+`docker run --rm ghcr.io/radiusward/radiusward-server:0.1.0-rc.1 version` prints the version. The subcommands are
+`cluster-node`, `gateway`, `cluster-backup`, `cluster-restore`, `radclient`, `admin`, `probe` and `cluster-tool`.
+
+## The Compose stack
+
+The server repository's `deploy/compose/compose.yaml` runs the smallest complete cluster: three members, two
+gateways and PostgreSQL as the export destination, on one machine. The [quickstart](/docs/start/quickstart/) walks
+through it; the short form:
+
+```bash
+export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+docker compose -f deploy/compose/compose.yaml up -d --wait
+docker compose -f deploy/compose/compose.yaml down -v      # -v deletes the data volumes
+```
+
+| Service | Address in the stack | On your machine |
+|---|---|---|
+| `node-0`, `node-1`, `node-2` | 172.28.0.10–12 | management `127.0.0.1:9090`–`9092` |
+| `gateway-a`, `gateway-b` | 172.28.0.20–21 | accounting `1813/udp` and `1814/udp`, authentication `1812/udp` and `1815/udp`, management `127.0.0.1:9190`–`9191` |
+| `postgres` | 172.28.0.40 | `127.0.0.1:5432`, database `radius`, user `radiusward` |
+| `tools` | — | `radclient` as the entrypoint; `admin` and `probe` with `--entrypoint radiusward` |
+
+Configuration lives in `deploy/compose/config/`: `cluster.properties`, `gateway.properties`, the NAS entry and the
+users file. Per-container values — the member id, the gateway id, its address, the NAS secret — come from the
+environment. The NAS secret defaults to `testing123`; set `NAS_SECRET` for anything else.
+
+### Profiles
+
+The stack runs the `small` profile by default; two overlay files switch to the larger ones:
+
+```bash
+docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.standard.yaml up -d
+```
+
+| Profile | Member | Gateway | `/dev/shm` of a member |
+|---|---|---|---|
+| small (default) | 1 GiB, 1 CPU | 384 MiB | 512 MiB |
+| standard | 2 GiB, 2 CPU | 768 MiB | 1 GiB |
+| large | larger still; see `compose.large.yaml` | | |
+
+Measured with the small profile: 2 million sessions stay under 448 MiB of unreclaimable memory per member and
+321 MiB per gateway.
+
+## What to know
+
+- **Members are addressed by static IPs**, not container names: resolving a stopped container's name blocks for
+  seconds, which turns a 0.6-second election into a 5-second one.
+- **Source addresses on macOS.** Docker Desktop and Colima rewrite the source address of UDP that arrives through a
+  published port, so a NAS simulator on the Mac matches no NAS entry. Run test clients inside the network (the
+  `tools` service). On Linux published ports keep the source address.
+- **`/dev/shm`** holds the Aeron buffers; the stack sets `shm_size` (Docker's default of 64 MiB is too small).
+- **Data** lives in the named volumes `node-0`…`node-2`; a member needs free space above `cluster.disk.min.free`
+  (1 GiB) or it reports not ready; a full disk stops a member.
+- **fsync stays on**: `archive.file.sync.level=2`. Anything lower can lose acknowledged records on power loss —
+  measured, not assumed.
+- **Health checks** call `radiusward probe http://127.0.0.1:9090/ready`.
+- **A gateway reloads its configuration on `SIGHUP`**: `docker kill -s HUP <container>`.
+
+## PostgreSQL export
+
+The members export to the stack's PostgreSQL: one row per session in `accounting_session`, plus a `radacct` view in
+the column layout billing tools expect. `sink.pg.mode=sessions+events` keeps the event history as well.
+
+```bash
+docker compose -f deploy/compose/compose.yaml exec postgres psql -U radiusward radius -f /sql/examples.sql
+docker compose -f deploy/compose/compose.yaml run --rm --entrypoint sh tools -c \
+    'radiusward admin sinks --members 172.28.0.10,172.28.0.11,172.28.0.12 --egress-host $(hostname -i)'
+```
+
+## Backup and monitoring
+
+```bash
+docker compose -f deploy/compose/compose.yaml --profile backup up -d       # continuous backup, 127.0.0.1:9193
+docker compose -f deploy/compose/compose.yaml --profile monitoring up -d   # Prometheus 127.0.0.1:9095, Grafana 127.0.0.1:3000
+```
+
+The backup keeps a copy of the log and snapshots outside the cluster in its own volume; a cluster that lost its
+quorum is restored from it. Grafana comes with the five radiusward dashboards and Prometheus with the alert rules.
+
+## Beyond one machine
+
+The Compose stack is for evaluation and small sites. For production, the members belong on separate machines or
+nodes: [Kubernetes](/docs/deployment/kubernetes/) with the Helm chart, hosts with systemd, or Amazon ECS — all in
+[Operating radiusward](/docs/operate/overview/).

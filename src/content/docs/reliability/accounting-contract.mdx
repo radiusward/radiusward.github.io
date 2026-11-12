@@ -1,0 +1,125 @@
+---
+title: "The accounting contract"
+description: "What a radiusward Accounting-Response guarantees, under which assumptions, what happens without a majority of the cluster, how retransmissions are deduplicated, and where exported data stands at that moment."
+---
+
+import { DOCS, REPORTS } from '../../../consts';
+
+An Accounting-Request is a record a NAS wants to hand over: a session started, is still running, or ended. This page
+says exactly what radiusward promises when it answers — and when it stays silent. It is the property radiusward is
+built around.
+
+## The guarantee
+
+<Callout type="tip" title="When radiusward sends an Accounting-Response">
+The record has been appended to the replicated log and **written to disk with fsync on a majority of the cluster**
+(two of three members). It survives the loss of any single member, including a power loss of that member.
+</Callout>
+
+The gateway sends the response only after the cluster reports the record **committed**. Not after it was queued
+locally, not after a network send succeeded, and not after a single member received it.
+
+What the guarantee assumes:
+
+- **Three cluster members**, a majority of which can reach each other.
+- **fsync on** — `archive.file.sync.level=2`, the default: data and metadata are flushed to disk before a member
+  confirms. Below that level a power loss can lose acknowledged records; the lower levels exist for tests, not for
+  production.
+- **Disks that honour fsync.** On Linux this is tested with a simulated power loss of all members
+  (<a href={`${REPORTS}/linux/`}>fault-injection report</a>). macOS `fsync` does not flush the drive cache, so
+  durability is claimed for Linux only.
+
+## What an acknowledgement does not mean
+
+**It does not mean "written to the billing database".** Databases and other destinations (sinks) are fed from the
+committed log *after* the acknowledgement, normally within milliseconds to seconds. Committed in the log and delivered
+to a sink are two different things, and radiusward keeps them apart:
+
+- While a sink is down, the log on disk is the buffer and acknowledgements continue.
+- A sink marked `required` that falls more than `sink.<name>.max.lag` behind (default 4 hours) **stops new
+  acknowledgements** until it catches up — the NAS keeps the records and retries.
+- An optional sink is detached instead and can be repaired later with `radiusward admin resync`, as long as the log
+  still holds the position.
+- In the database, delivery is exactly once: events are inserted only if absent, sessions updated only if newer, and a
+  replaced exporter cannot write.
+
+`radiusward admin verify-export` compares a log of acknowledged records with the database and the cluster.
+
+## When radiusward stays silent
+
+RADIUS has no "Accounting-Reject". When radiusward cannot promise the record is safe, it does not answer, and the NAS
+retransmits — which NAS devices do by design. It stays silent when:
+
+- the packet is malformed, comes from an address that is not a configured NAS, or its authenticator does not verify;
+- a gateway's queue is full (it sheds load instead of blocking);
+- **no majority of the cluster is reachable**, or a leader election is in progress;
+- writing to disk fails;
+- a required sink is further behind than its limit.
+
+<Callout type="note" title="Silence is not loss">
+Silence never means a record was lost *after* an acknowledgement. It means the NAS still owns the record and must
+retry or buffer it. Losing two of three members at once is the case the cluster cannot cover: it stops acknowledging
+until a majority is back — consistency before availability, on purpose.
+</Callout>
+
+## Retransmissions and duplicates
+
+A NAS that got no answer cannot know whether its record was committed, so it retries — possibly after a leader
+failover, and possibly through the other gateway. radiusward recognises a retry at two levels:
+
+| Level | Recognises | By |
+|---|---|---|
+| Gateway response cache | an identical retransmission to the same gateway | source address and port, RADIUS Identifier, Request Authenticator |
+| Cluster | the same accounting event, whichever way it arrives | NAS identity, `Acct-Session-Id`, `Acct-Status-Type`, and `Acct-Session-Time` or `Event-Timestamp` |
+
+A duplicate is answered with an Accounting-Response like the original and is **not applied or exported a second
+time**. The cluster's key deliberately leaves out `Acct-Delay-Time` (it changes on every retransmission) and the
+8-bit Identifier (it is reused).
+
+How long duplicates are recognised:
+
+- **While the session lives**, and for `service.tombstone` after its Stop (default 1 hour): Interim updates that are
+  not newer than the last one applied are duplicates.
+- Events without a progress value are remembered by their exact key for `service.exact.key.window` (default
+  15 minutes). A retransmission older than that window could be applied twice; sinks are idempotent per event as a
+  second line of defence.
+- The deduplication state is part of the cluster's snapshots and survives restarts.
+
+Records that arrive out of order are handled too: an Interim whose Start never arrived creates the session, a late
+Start is merged into it, and records arriving after the Stop are acknowledged and kept as stale rather than reopening
+the session.
+
+## What the cluster tolerates
+
+<Cards>
+	<Card title="Tolerated without losing acknowledged records">
+		One cluster member lost (crash, power loss, disk loss) · any number of gateways lost · network partitions that
+		leave a majority connected · sink outages up to their lag limit.
+	</Card>
+	<Card title="Not tolerated">
+		Two of three members lost at once: no majority, so no acknowledgements until one returns. The surviving
+		member's data is intact. A continuous backup outside the cluster restores a cluster that lost its quorum, up to
+		the backup's position.
+	</Card>
+</Cards>
+
+## Questions for your evaluation
+
+| Situation | Check before production |
+|---|---|
+| Leader failure | how long your NAS waits before retrying, and that its retries are counted once |
+| Loss of the majority | how long your NAS buffers accounting, and which of your authentication features need the cluster |
+| A sink that is down | that lag is visible and alerted, and whether the sink is required or optional |
+| A lost quorum | that the continuous backup runs, how far behind it is, and that a restore has been practised |
+
+## The evidence
+
+Every statement on this page maps to an automated test in the{' '}
+<a href={`${DOCS}/testing/failure-matrix.md`}>failure matrix</a> — for example: no acknowledgement without a
+majority, and the retry applied once after recovery; the leader killed under load with every acknowledged record
+kept; a gateway killed between commit and response, with the retry through the other gateway applied once. The
+results are published as <a href={`${REPORTS}/`}>test reports</a>: fault injection on Linux nightly (power loss with
+LazyFS, partitions, full disks), the Kubernetes scenarios nightly, end-to-end and integration tests on every change.
+
+The full contract, with the response format and the export model in detail:{' '}
+<a href={`${DOCS}/accounting-contract.md`}>accounting-contract.md</a> in the server repository.

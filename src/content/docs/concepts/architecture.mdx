@@ -1,0 +1,79 @@
+---
+title: "Architecture"
+description: "Gateways, the cluster and the exporter: the accounting path through the replicated log, the authentication path that stays on the gateways, and the export boundary."
+source: "docs/architecture.md"
+---
+
+import ArchitectureDiagram from '../../../components/ArchitectureDiagram.astro';
+
+radiusward separates three jobs that a single RADIUS server process usually does together: talking to the network,
+keeping the accounting state, and writing it to databases.
+
+<div class="diagram"><ArchitectureDiagram /></div>
+
+## Components
+
+| Component | Responsibility | Holds |
+|---|---|---|
+| **Gateway** | sockets, packet checks, authentication decisions, forwarding accounting to the cluster, answering after the commit | nothing that has to survive it: a cache of recent answers for retransmissions |
+| **Cluster member** | the replicated log and the accounting state machine: sessions, deduplication, shared authentication state | the log and snapshots on disk |
+| **Exporter** | runs inside every member; one member exports each sink, chosen by a lease | a checkpoint per sink |
+| **Identity store** | users and credentials for authentication: users file, SQL, LDAP/AD, Netlogon | your data, unchanged |
+| **Backup** | a continuous copy of the log and snapshots outside the cluster | a member's layout on its own disk |
+
+## The accounting path
+
+1. The gateway receives an Accounting-Request, checks it — length, a configured NAS, the authenticator — and reads the
+   attributes accounting needs. A malformed or unauthentic packet is dropped silently, as RADIUS requires.
+2. A retransmission it has already answered is answered again from its cache, without going to the cluster.
+3. Otherwise it sends the record to the cluster's leader, which appends it to the log and replicates it.
+4. When two of the three members have written it to disk, the record is **committed**: the state machine applies it —
+   or recognises it as a duplicate — and the gateway sends the Accounting-Response.
+5. Afterwards, independently, the exporter delivers the committed record to each sink.
+
+The guarantee sits at step 4; [the accounting contract](/docs/reliability/accounting-contract/) states it exactly.
+
+## The authentication path
+
+Access-Requests stay on the gateway: it looks the user up in the identity store, verifies the credential, applies the
+policy and answers — or forwards the request to a home server when the realm belongs elsewhere. EAP conversations,
+which take several round trips, stay on the gateway that began them — a NAS keeps a login on one gateway, and if
+that gateway fails the client starts the login over.
+
+The cluster is involved only for state every gateway has to agree on:
+
+- **Simultaneous-Use**: how many devices a user has online, reserved in the cluster at authentication and confirmed by
+  the accounting Start.
+- **EAP-SIM and EAP-AKA sequence numbers**, which must never be reused across gateways.
+
+Everything else keeps working when the cluster has no majority.
+
+## The replicated state
+
+The cluster runs on Aeron Cluster (Raft consensus): one leader orders every command, followers replicate it, and a
+command is committed once a majority has it on disk. The state machine is deterministic — no clocks, no I/O, no
+randomness — so every member computes the same state from the same log, and a member that restarts or replaces its
+disk catches up by replaying.
+
+Its memory grows with the number of **open sessions**, about 80 bytes each, not with the number of records: an
+Interim update replaces the previous one. Snapshots are taken hourly, and the log below what everyone has processed is
+purged.
+
+## The export boundary
+
+Each sink — PostgreSQL, JSON-lines files, forwarding to other RADIUS servers — gets exactly what the cluster applied,
+in order, from the committed log. Writes are idempotent (an event is inserted only if absent, a session updated only
+if newer), so an exporter that is replaced can repeat its last batch safely.
+
+<Callout type="note" title="Two boundaries">
+An acknowledgement means the record is committed in the cluster. Delivery to a sink happens after it, normally within
+seconds. A sink that is down is buffered by the log; how far behind it may fall is configured per sink.
+</Callout>
+
+## What to evaluate
+
+- Where the members run, and the latency between them — every acknowledgement waits for a majority.
+- Storage that honours fsync, and the durability setting the guarantee assumes.
+- How each NAS is configured with two gateways, and its retry timeout.
+- Which of your authentication features need the cluster (Simultaneous-Use, SIM/AKA).
+- How export lag is watched, and how a lost quorum is restored from the backup.

@@ -1,0 +1,44 @@
+---
+title: "Is it a fit?"
+description: "When radiusward is worth evaluating, and when to evaluate carefully or choose something simpler: the trade-offs of a replicated RADIUS server, stated plainly."
+---
+
+radiusward makes one trade on purpose: **accounting is acknowledged only when it is safe on a majority of three
+members.** That buys durable records and clean failovers, and it costs a cluster to run. Whether that trade is right
+depends on what your accounting records are worth to you.
+
+## Consider radiusward when
+
+- **Accounting records matter.** They feed billing, usage limits, reconciliation or compliance, and losing the
+  records of the last seconds before a crash — or counting them twice after a failover — is a real problem.
+- **You want to verify before you trust.** The [accounting contract](/docs/reliability/accounting-contract/), the
+  [failure scenarios](/reliability/) and the tests behind them are published, and you can run them yourself.
+- **You can run three members and two gateways.** On Kubernetes that is a Helm release; on hosts, five services.
+- **You run Java infrastructure**, or want extension points in Java: identity stores and export destinations are
+  plug-ins.
+
+## Evaluate carefully when
+
+- **You need the simplest possible installation.** A single RADIUS server process is simpler to run than a cluster.
+  If losing a few seconds of accounting on a crash is acceptable, you may not need replication.
+- **You need device certifications or a support contract today.** radiusward has interoperability tests with other
+  implementations, not certifications, and no commercial support yet.
+- **You depend on another RADIUS server's modules or configuration format.** radiusward has its own configuration
+  and is not compatible with them; a migration is a re-configuration, best done in a lab first.
+- **Your members would sit on high-latency or unreliable links.** Every acknowledgement waits for a majority, so the
+  round trip between members is part of the answer time.
+
+## What it costs to run
+
+| | |
+|---|---|
+| Processes | three cluster members and at least two gateways |
+| Memory | about 1 GiB per member in the small profile, which holds two million sessions |
+| Disk | each member keeps the replicated log and snapshots; fsync is on |
+| Network | members reach each other directly; each NAS is configured with two gateways |
+| Operations | metrics, dashboards and alert rules come with it; a continuous backup runs outside the cluster |
+
+## Not sure?
+
+Run the [quickstart](/docs/start/quickstart/) on a laptop, kill the leader while it carries load, and look at what
+your NAS would have seen. That is what the project does every night on Kubernetes.

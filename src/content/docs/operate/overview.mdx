@@ -1,0 +1,70 @@
+---
+title: "Operating radiusward"
+description: "Deployment is the beginning: choosing a platform, watching the right signals, practising recovery, upgrading member by member, and a checklist before production."
+source: "docs/operations/monitoring.md"
+---
+
+export const DOCS = 'https://github.com/radiusward/radiusward-server/blob/main/docs';
+
+A cluster that runs is not yet a cluster you can operate. Plan how you will see trouble, recover from it and upgrade,
+before an evaluation becomes production.
+
+## Choose a platform
+
+| Platform | Guide | What it gives you |
+|---|---|---|
+| Kubernetes | [Kubernetes](/docs/deployment/kubernetes/) | the Helm chart: members with their own volumes, gateways with their own addresses, the backup, dashboards and alert rules; tested nightly under failures |
+| Docker | [Docker](/docs/deployment/docker/) | a Compose stack for evaluation and small sites |
+| Amazon ECS | <a href={`${DOCS}/operations/aws-ecs.md`}>aws-ecs.md ↗</a> | example CloudFormation and Terraform templates on Graviton — validated, not yet deployed by the project |
+| Hosts with systemd | <a href={`${DOCS}/operations/bare-metal.md`}>bare-metal.md ↗</a> | units for members, gateways and the backup |
+
+## Watch the right signals
+
+Every process exposes Prometheus metrics on its management port; five Grafana dashboards and a set of alert rules come
+with the project. The questions they answer:
+
+- **Is there a leader, and is it stable?** — no leader for 30 s, frequent elections, a member down.
+- **Do gateways reach the cluster, and do they shed load?** — a disconnected gateway, requests dropped because a queue
+  is full.
+- **Are the sinks keeping up?** — export lag against the limit, a detached sink, sink errors.
+- **Is there room on disk?** — a member below its free-space limit reports not ready before the disk is full.
+- **Is the backup current?** — not recording, too far behind, snapshot too old.
+- **Does authentication work?** — reject ratio, an identity store that does not answer, a home server marked dead,
+  server certificates about to expire.
+
+Per-request traces for chosen users or NAS entries, and an authentication log with the reason for every decision, help
+with the cases metrics cannot explain. <a href={`${DOCS}/operations/monitoring.md`}>Metrics, dashboards and alerts ↗</a>
+
+## Practise recovery
+
+Replication is not a backup. Practise each procedure once before you need it:
+
+1. **Replace a member's disk** — the member seeds itself from the others.
+2. **Kill the leader under load** — and look at what your NAS saw.
+3. **Restore a lost quorum from the backup** — on a copy of the cluster, not the real one.
+
+<a href={`${DOCS}/operations/backup.md`}>Backup and restore ↗</a>
+
+## Upgrade member by member
+
+Restart the members with the new release one at a time, waiting until each is ready and all agree on the state before
+the next. A change to how records are applied takes effect only once every member runs the new release, at the same
+log position on all of them; until then a rollback is possible. Gateways can be upgraded in any order.
+<a href={`${DOCS}/operations/release.md`}>Upgrading a cluster ↗</a>
+
+## Before production
+
+- Pin the release you evaluated, and write down the topology.
+- Replace every example secret: NAS shared secrets, API tokens, certificates and keys.
+- Keep the management port (metrics, health, the CoA and reload APIs) on a network only operators reach; it binds to
+  `127.0.0.1` unless you change it, and the APIs exist only with a token.
+- Check that storage honours fsync, and keep the durability setting at its default.
+- Test your own NAS devices and authentication methods, including their retry timeouts.
+- Run the continuous backup and alert on its lag.
+- Practise one recovery scenario and record the result.
+- Decide who upgrades, who rolls back, and who is called.
+
+<Callout type="note" title="A checklist is not certification">
+These are prompts for your own review. They do not replace a security review of your deployment or the detailed
+guides in the server repository.
+</Callout>

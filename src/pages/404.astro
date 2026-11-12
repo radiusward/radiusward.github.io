@@ -1,0 +1,18 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+import Base from '../layouts/Base.astro';
+---
+<Base title="Page not found" description="This page does not exist." noindex>
+	<div class="container nf">
+		<span class="eyebrow">404</span>
+		<h1>This page does not exist.</h1>
+		<p>It may have moved while the site is being written. Try the <a href="/docs/">documentation</a> or the search (⌘K).</p>
+	</div>
+</Base>
+<style>
+	.nf { padding-block: var(--space-20); }
+	h1 { font-size: var(--text-2xl); }
+	p { margin-top: var(--space-4); color: var(--color-text-muted); }
+	a { color: var(--color-primary); text-decoration: underline; }
+</style>

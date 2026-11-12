@@ -1,0 +1,138 @@
+---
+title: "First authentication"
+description: "Send Access-Requests to the local cluster with PAP, CHAP and MS-CHAPv2, see an Access-Accept and a delayed Access-Reject, add a user and reload the gateway, and learn where EAP starts."
+source: "docs/operations/docker.md"
+---
+
+This follows the [quickstart](/docs/start/quickstart/): the Compose stack is running, and `rad` is the alias for
+`radclient` inside it. If not:
+
+```bash
+export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+docker compose -f deploy/compose/compose.yaml up -d --wait
+alias rad='docker compose -f deploy/compose/compose.yaml run --rm tools'
+```
+
+Authentication is decided on the gateways: a gateway looks the user up in its identity store, checks the credential
+and answers. The cluster is not involved for what you do on this page. The stack's store is a users file,
+`deploy/compose/config/users`, with the demo user `alice` and her password `secret`.
+
+<Callout type="caution" title="Demo users and secrets">
+`alice`/`secret` and the shared secret `testing123` exist for this stack only. Never carry them into a reachable
+deployment.
+</Callout>
+
+## 1. An Access-Accept with PAP
+
+```bash
+rad auth --server gateway-a:1812 --secret testing123 --user alice --password secret
+```
+
+```text
+Received Access-Accept id=197 length=52
+  Message-Authenticator = 0xe7bf23ca04cc163a35c65ffd393288bf
+  Reply-Message = "Hello, alice"
+Response authenticator OK, attempt 1, 13 ms
+```
+
+The `Reply-Message` comes from the users file: a reply attribute configured for `alice`. The response carries a
+`Message-Authenticator`, which radiusward signs by default; the client checked it.
+
+## 2. The same with CHAP and MS-CHAPv2
+
+The method is what the NAS and the user's device agree on; the stored password is the same cleartext entry.
+
+```bash
+rad auth --server gateway-a:1812 --secret testing123 --user alice --password secret --method chap
+rad auth --server gateway-a:1812 --secret testing123 --user alice --password secret --method mschapv2
+```
+
+Both are accepted. The MS-CHAPv2 answer also carries `MS-MPPE-Send-Key` and `MS-MPPE-Recv-Key`, the keys a NAS uses
+to encrypt the link — what a VPN concentrator or a Wi-Fi controller expects.
+
+<Callout type="note" title="Which methods a stored password allows">
+CHAP and MS-CHAP need the cleartext password, or for MS-CHAP an NT hash, because the server has to compute the same
+challenge response the client did — and a store must opt in to that use of its cleartext passwords (`chap` and
+`mschap` in the store's settings, as the stack's `gateway.properties` does). A user stored with bcrypt, SHA-crypt or yescrypt can be verified with PAP and
+with EAP methods that carry a password (PEAP, TTLS), but not with CHAP or MS-CHAP.
+[Choosing a method](/docs/authentication/choosing-a-method/) has the full table.
+</Callout>
+
+## 3. A wrong password, and a wrong shared secret
+
+```bash
+rad auth --server gateway-a:1812 --secret testing123 --user alice --password wrong
+```
+
+```text
+Received Access-Reject id=2 length=38
+Response authenticator OK, attempt 1, 1005 ms
+```
+
+An Access-Reject — after about a second. radiusward holds rejects back for `auth.reject.delay` (1 s by default) to
+slow down password guessing, without blocking a worker meanwhile. `radclient` exits with code 3 on a reject, 0 on an
+accept. An unknown user gets the same answer at the same speed: the response does not reveal whether the user exists.
+
+Now a request with the wrong **shared secret**, the key the NAS and the server share:
+
+```bash
+rad auth --server gateway-a:1812 --secret nope --user alice --password secret --timeout 2s --retries 0
+```
+
+```text
+No response after 1 attempt(s)
+```
+
+Nothing comes back. A request whose authenticator does not verify is dropped without an answer, as RADIUS requires,
+and counted on the gateway:
+
+```bash
+curl -s localhost:9190/metrics | grep ^radiusward_gateway_access_requests_total | grep -v ' 0$'
+```
+
+```text
+radiusward_gateway_access_requests_total{gateway="1",result="received"} 6
+radiusward_gateway_access_requests_total{gateway="1",result="message_authenticator_failed"} 1
+radiusward_gateway_access_requests_total{gateway="1",result="accepted"} 3
+radiusward_gateway_access_requests_total{gateway="1",result="rejected"} 2
+radiusward_gateway_access_requests_total{gateway="1",result="rejects_delayed"} 2
+```
+
+## 4. Add a user and reload
+
+Append a user to the users file and tell the gateway to reload its configuration. The file is mounted into the
+containers, so the edit is visible at once; `SIGHUP` reloads NAS entries, identity stores, counters and rules without
+a restart.
+
+```bash
+echo 'bob Cleartext-Password := "bob-pass"' >> deploy/compose/config/users
+docker kill -s HUP radiusward-gateway-a-1
+rad auth --server gateway-a:1812 --secret testing123 --user bob --password bob-pass
+```
+
+```text
+Received Access-Accept id=56 length=38
+```
+
+The gateway's log records the reload: `configuration reloaded: NAS entries: 1 (were 1), stores: demo`. In a real
+deployment the users would live in SQL, LDAP or Active Directory; the users file is the simplest store and the same
+syntax applies to check items, reply items and groups.
+
+Restore the demo file afterwards if you want the stack as it was: `git checkout deploy/compose/config/users`.
+
+## 5. Where EAP starts
+
+Wi-Fi and wired 802.1X use EAP — several round trips between the device and the server, carried inside RADIUS. The
+gateways handle EAP-TLS, PEAP, TTLS, TEAP, EAP-pwd and EAP-SIM/AKA; `radclient` has no EAP client, so the first EAP
+login is a job for a real device or for `eapol_test`, the client from `wpa_supplicant` that the project's own
+interoperability tests use. It needs a server certificate, which the stack does not ship.
+
+[Choosing a method](/docs/authentication/choosing-a-method/) leads from the credentials and clients you have to the
+method and store that fit; the server repository's configuration reference has every key for certificates, stores and
+EAP.
+
+## Clean up
+
+```bash
+docker compose -f deploy/compose/compose.yaml down -v
+```

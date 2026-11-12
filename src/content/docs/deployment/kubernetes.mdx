@@ -1,0 +1,107 @@
+---
+title: "Kubernetes"
+description: "The Helm chart: three members as a StatefulSet with their own volumes, gateways with their own addresses, the continuous backup, dashboards and alert rules; what the nodes need; replacing a volume, restoring a lost quorum, upgrading."
+source: "docs/operations/kubernetes.md"
+---
+
+The Helm chart runs the whole cluster — three members, the gateways, the backup — and is tested nightly on kind under
+load while the leader is killed, members and gateways are rolled, a volume is replaced and a lost quorum is restored.
+
+## Install
+
+```bash
+helm install radiusward oci://ghcr.io/radiusward/charts/radiusward --version 0.1.0-rc.1 \
+    -n radius --create-namespace -f my-values.yaml
+kubectl -n radius get pods -l app.kubernetes.io/instance=radiusward
+kubectl -n radius exec radiusward-node-0 -- radiusward probe http://127.0.0.1:9090/ready
+```
+
+A minimal `my-values.yaml`:
+
+```yaml
+profile: small                      # small | standard | large
+node:
+  persistence: {size: 100Gi, storageClass: local-ssd}
+  export:
+    postgres: {enabled: true, url: "jdbc:postgresql://postgres:5432/radius", existingSecret: radius-db}
+gateway:
+  nas:
+    - {name: branch-routers, address: 10.20.0.0/16, existingSecret: nas-secrets, existingSecretKey: branch, vendor: cisco}
+  auth:
+    enabled: true
+    stores:
+      - {name: db, type: sql, url: "jdbc:postgresql://postgres:5432/radius", user: radius, existingSecret: radius-db}
+    eap:
+      methods: [peap, ttls]
+      tls: {existingSecret: radius-eap-tls}     # a kubernetes.io/tls Secret, plus ca.crt for EAP-TLS
+```
+
+Secrets never go into ConfigMaps: NAS secrets and store passwords come from Kubernetes Secrets as environment
+variables, users files and certificates are mounted from Secrets. Every configuration key is reachable through
+`node.config` and `gateway.config`.
+
+## What the chart creates
+
+| Object | Purpose |
+|---|---|
+| StatefulSet `<release>-node`, 3 pods | the members; each finds the others by DNS name and has one volume |
+| headless Service `<release>-node` | the members' names, published before they are ready (none is ready without a quorum) |
+| StatefulSet `<release>-gateway`, 2 pods by default | the gateways; no volumes |
+| Service `<release>-gateway-<n>` per gateway | each gateway's own RADIUS address — a LoadBalancer with `externalTrafficPolicy: Local` |
+| StatefulSet `<release>-backup` | the continuous backup, with its own volume |
+| PodDisruptionBudgets | members `maxUnavailable: 1`, gateways `minAvailable: 1` |
+| NetworkPolicies (optional) | Aeron only between members and gateways; RADIUS from the networks you list |
+| PodMonitor, PrometheusRule, dashboard ConfigMaps (optional) | the alert rules and the five Grafana dashboards |
+
+## Two addresses per NAS
+
+Configure every NAS with **two gateways** as its primary and secondary RADIUS server. When a node fails, the NAS
+retries through the other gateway and the cluster recognises the retry. With a single shared address, Kubernetes
+keeps sending part of the traffic to a failed node's gateway until it marks the node NotReady — about 40–50 seconds;
+in the project's own test that lost 7.6 % of the accounting, where two addresses lost nothing.
+
+NAS entries are matched by source address, so the gateways must see it: `externalTrafficPolicy: Local` on cloud
+load balancers and MetalLB (the chart's default), or gateways on edge nodes with host networking.
+
+## What the nodes need
+
+- **Larger UDP socket buffers** than most kernels allow by default; the sysctls are not namespaced, so set them on
+  the nodes: `net.core.rmem_max=2097152 net.core.wmem_max=2097152`.
+- **Storage that honours fsync and answers quickly**: every Accounting-Response waits for an fsync on a majority.
+  Local volumes are best; network block storage works with higher latency. 100 Gi per member is ample for 500,000
+  sessions.
+- **Guaranteed CPU** for the members (requests equal limits in the chart): a throttled leader looks dead and costs an
+  election.
+
+| Profile | Member | Gateway |
+|---|---|---|
+| small | 1 CPU, 1.5 Gi | 1 CPU, 768 Mi |
+| standard | 2 CPU, 4 Gi | 2 CPU, 1.25 Gi |
+| large | 4 CPU, 11 Gi | 4 CPU, 2.25 Gi |
+
+## Replacing a member's volume
+
+Delete the member's claim and pod. The new pod finds its volume empty, copies the latest snapshot and the log after
+it from the other members, and rejoins — on kind this took 4 seconds under load, and the member was ready 10 seconds
+after it started. The other two keep the quorum meanwhile.
+
+## A lost quorum
+
+The chart runs the continuous backup. After a lost quorum, `scripts/k8s-restore.sh -n <namespace> -r <release>`
+restores all three members from it through temporary pods that mount one volume at a time, so node-local volumes work
+too. The cluster goes on from the backup's position.
+
+## Upgrades
+
+`helm upgrade` rolls the members one at a time; a restarted member counts as ready only once its election is closed,
+so the quorum is kept. Each member restart may cost one leader election of about 2 seconds, within a NAS's
+retransmission time — on kind, rolling every member under load lost nothing and caused no retransmission. Gateways
+roll one at a time as well; a stopping gateway keeps answering for `gateway.shutdownDrain` (5 s) after it reports
+not ready, but a NAS that sent to it in that moment retries through its secondary. Restart gateways in quiet hours if
+NAS timeouts matter.
+
+Changes to how records are applied activate on their own once every member runs the new version; after that, an
+image older than the active state version is refused.
+
+The chart's values and the measurements behind its design:
+<a href="https://github.com/radiusward/radiusward-server/blob/main/docs/operations/kubernetes.md">kubernetes.md ↗</a>.

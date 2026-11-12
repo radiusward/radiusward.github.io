@@ -1,0 +1,81 @@
+---
+title: "Evidence: tests and benchmarks"
+description: "What the project publishes to back its claims — integration, end-to-end, fault-injection and Kubernetes test reports, and benchmarks — how to read them, and what they do not show."
+source: "docs/testing/strategy.md"
+---
+
+import { REPORTS } from '../../../consts';
+
+Every claim on this site points to a test or a published result. This page explains what those are, where to find
+them, and where their limits lie.
+
+## The published reports
+
+The server repository runs its slower test suites in CI and publishes the results as reports with history, at
+<a href={`${REPORTS}/`}>{REPORTS.replace('https://', '')}</a>:
+
+| Report | Runs | What it proves |
+|---|---|---|
+| <a href={`${REPORTS}/integration/`}>Integration ↗</a> | on every change to `main` | gateways, cluster members and identity stores together in one JVM: the state machine, deduplication, snapshots, authentication methods, EAP against `eapol_test`, RadSec and DTLS against `radsecproxy`, LDAP and Netlogon against Samba AD |
+| <a href={`${REPORTS}/e2e/`}>End-to-end ↗</a> | on every change | separate radiusward processes: an acknowledgement only after the commit, no acknowledgement without a majority, the leader killed under load, a gateway killed between commit and response, retransmissions, a rolling upgrade |
+| <a href={`${REPORTS}/linux/`}>Fault injection ↗</a> | nightly, in containers on Linux | power loss of all three members with LazyFS (a file system that loses what was not fsynced), network partitions, a full disk, overload with 2 million sessions in 1 GiB, a PostgreSQL outage, a blocking and a detached sink, systemd failover |
+| <a href={`${REPORTS}/k8s/`}>Kubernetes ↗</a> | nightly, on kind with the Helm chart | under accounting and authentication load through a load balancer: the leader killed, members and gateways rolled, a member's volume replaced, a lost quorum restored from the backup; opt-in: 500,000 sessions with a node drained |
+
+Each report is an Allure report: every test with its steps, how long it took, and its outcome over the last 30
+runs, so a failure that comes and goes is visible as such.
+
+## The benchmarks
+
+<a href={`${REPORTS}/benchmarks/`}>The benchmark pages ↗</a> show how much radiusward carries, measured the same way
+in every environment by one harness:
+
+- **A ladder** of rising request rates for accounting, authentication (PAP, CHAP, MS-CHAPv2) and a 70/30 mix. A
+  step passes only if **no request is lost**, **p99 latency stays under 500 ms**, and at least 90 % of the target rate
+  is answered. After the first failed step the harness bisects to within 10 %; the highest passing rate is the
+  ceiling.
+- **A lower bound is marked "≥"**: when the load generators or the host ran out before radiusward did, the number is
+  not radiusward's limit.
+- **A leader kill** at 70 % of the accounting ceiling, measuring what was lost (nothing, so far), retransmissions and
+  the longest wait.
+- **CPU and memory per process** at the ceiling, and the gateway's packet path on one core from JMH.
+
+The weekly run on a GitHub runner is a **trend**, not a capacity figure: three members, two gateways, PostgreSQL and
+the generators share four vCPUs, and each member and gateway is limited to one CPU. The ceilings per profile on
+dedicated machines are measured on AWS, with the generators on their own instances; those results appear on the same
+pages as `aws-small` and `aws-standard` once they exist.
+
+## How to read a claim on this site
+
+| The site says | Where to check |
+|---|---|
+| "nothing acknowledged is lost when the leader is killed" | the end-to-end report (`LeaderFailoverIT`), the Kubernetes report (`leader-kill`), every benchmark run's failover section |
+| "no acknowledgement without a majority" | the end-to-end report (`AckAfterCommitIT`) |
+| "survives power loss of a member" | the fault-injection report (`PowerLossIT`), with the control run that shows the loss without fsync |
+| "a member reseeds itself after a lost disk" | the Kubernetes report (`replace-volume`), the integration report (`ClusterSeedIT`) |
+| "a lost quorum is restored from the backup" | the Kubernetes report (`restore-quorum`), the integration report (`ClusterBackupIT`) |
+| "2 million sessions in 1 GiB" | the fault-injection report (`OverloadIT`) |
+| a throughput figure | the benchmark page of that environment, with the machine, the method and the raw result |
+
+The full list of failure cases, each with its expected behaviour and its test, is the
+<a href="https://github.com/radiusward/radiusward-server/blob/main/docs/testing/failure-matrix.md">failure matrix ↗</a>.
+
+## Compatibility: levels of evidence
+
+A dictionary is not a test, and a test against another implementation is not a test against your device. The
+project uses these levels, and claims no more than the level reached:
+
+| Level | Meaning | Where radiusward stands |
+|---|---|---|
+| Dictionary available | the attributes of a vendor can be decoded | the bundled vendor dictionaries |
+| Fixture tested | representative packets of a vendor pass the codec and the accounting extractor in CI | 33 **synthetic** packets for 11 NAS types (broadband gateways and Wi-Fi) — not captures from devices |
+| Software interoperability tested | tested against a named implementation in CI | `eapol_test` (wpa_supplicant 2.10) for EAP, `radsecproxy` for RadSec and DTLS, Samba AD for LDAP and Netlogon, an independent RADIUS library for the codec, another RADIUS server for PAP, CHAP, MS-CHAP and EAP |
+| Device tested | tested against a named device and firmware | **none yet** |
+| Operator reported | a report from a deployment, with environment and date | **none yet** |
+
+## What the evidence does not show
+
+- It is produced by the project, not by an independent party; there has been no external security audit.
+- Durability under power loss is tested on Linux. macOS does not flush the drive cache on `fsync`, so no durability
+  claim is made for it.
+- Results from one machine or cluster do not carry over to another; run the harness and the failure tests in your
+  own environment before you rely on them.

@@ -1,0 +1,107 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+import { REPO } from '../consts';
+interface Props { section?: 'home' | 'product' | 'docs' | 'reliability'; }
+const { section } = Astro.props;
+const items = [
+	{ key: 'product', label: 'Product', href: '/product/' },
+	{ key: 'docs', label: 'Documentation', href: '/docs/' },
+	{ key: 'reliability', label: 'Reliability', href: '/reliability/' },
+];
+---
+<header class="site-header">
+	<div class="container header-inner">
+		<a class="brand" href="/" aria-label="radiusward home">
+			<svg viewBox="0 0 32 36" fill="none" aria-hidden="true">
+				<path d="M16 2 29 9.5v16L16 34 3 25.5v-16L16 2Z" stroke="currentColor" stroke-width="2"></path>
+				<path d="M10 24V12h7a4 4 0 0 1 0 8h-7m7 0 5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"></path>
+			</svg>
+			<span>radiusward</span>
+		</a>
+
+		<nav class="header-nav" id="main-nav" aria-label="Main">
+			{items.map((i) => (
+				<a href={i.href} aria-current={section === i.key ? 'page' : undefined}>{i.label}</a>
+			))}
+			<a href={REPO}>GitHub ↗</a>
+		</nav>
+
+		<div class="header-tools">
+			<button class="search-trigger" type="button" data-open-search aria-haspopup="dialog">
+				<span>Search</span><kbd>⌘ K</kbd>
+			</button>
+			<button class="icon-btn" type="button" data-theme-toggle aria-label="Switch colour theme" title="Switch colour theme">◐</button>
+			<button class="icon-btn menu-toggle" type="button" aria-controls="main-nav" aria-expanded="false">Menu</button>
+		</div>
+	</div>
+</header>
+
+<script>
+	const toggle = document.querySelector<HTMLButtonElement>('[data-theme-toggle]')!;
+	const paint = () => {
+		const dark = document.documentElement.dataset.theme === 'dark';
+		toggle.textContent = dark ? '☼' : '◐';
+		toggle.setAttribute('aria-label', `Switch to ${dark ? 'light' : 'dark'} mode`);
+	};
+	paint();
+	toggle.addEventListener('click', () => {
+		const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+		document.documentElement.dataset.theme = next;
+		try { localStorage.setItem('theme', next); } catch {}
+		paint();
+	});
+	const menu = document.querySelector<HTMLButtonElement>('.menu-toggle')!;
+	const nav = document.getElementById('main-nav')!;
+	menu.addEventListener('click', () => {
+		const open = menu.getAttribute('aria-expanded') !== 'true';
+		menu.setAttribute('aria-expanded', String(open));
+		nav.classList.toggle('is-open', open);
+	});
+</script>
+
+<style>
+	.site-header {
+		position: sticky;
+		top: 0;
+		z-index: 30;
+		border-bottom: 1px solid var(--color-divider);
+		background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+		backdrop-filter: blur(14px);
+	}
+	.header-inner { display: flex; align-items: center; gap: var(--space-8); min-height: var(--header-height); }
+	.brand { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.04em; white-space: nowrap; }
+	.brand svg { width: 28px; height: 32px; color: var(--color-primary); }
+	.header-nav { display: flex; align-items: center; gap: var(--space-6); }
+	.header-nav a { position: relative; display: flex; align-items: center; min-height: var(--header-height); color: var(--color-text-muted); font-size: var(--text-sm); }
+	.header-nav a:hover { color: var(--color-text); }
+	.header-nav a[aria-current='page'] { color: var(--color-text); }
+	.header-nav a[aria-current='page']::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--color-primary); }
+	.header-tools { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+	.search-trigger {
+		display: flex; align-items: center; gap: var(--space-8);
+		min-height: 40px; padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+		background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-sm);
+	}
+	kbd { font-family: var(--font-code); font-size: var(--text-xs); color: var(--color-text-faint); }
+	.icon-btn {
+		display: grid; place-items: center; min-width: 42px; height: 42px; padding-inline: var(--space-2);
+		border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; font-size: var(--text-base);
+	}
+	.icon-btn:hover { background: var(--color-surface-2); }
+	.menu-toggle { display: none; font-size: var(--text-sm); }
+	@media (max-width: 860px) {
+		.header-inner { gap: var(--space-4); }
+		.header-nav {
+			display: none; position: absolute; top: var(--header-height); left: 0; right: 0;
+			padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-bg);
+		}
+		.header-nav.is-open { display: grid; }
+		.header-nav a { min-height: 48px; padding-inline: var(--space-3); }
+		.header-nav a[aria-current='page']::after { display: none; }
+		.menu-toggle { display: grid; }
+		.search-trigger kbd { display: none; }
+		.search-trigger { gap: 0; }
+	}
+</style>

@@ -1,0 +1,25 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+import { getCollection, render } from 'astro:content';
+import Docs from '../../layouts/Docs.astro';
+import Callout from '../../components/mdx/Callout.astro';
+import Card from '../../components/mdx/Card.astro';
+import Cards from '../../components/mdx/Cards.astro';
+import { scenarios } from '../../data/scenarios';
+
+export async function getStaticPaths() {
+	const docs = await getCollection('docs');
+	return docs.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+const { entry } = Astro.props;
+const { Content, headings: own } = await render(entry);
+// headings rendered by components do not reach the table of contents by themselves
+const headings =
+	entry.id === 'reliability/failure-behaviour'
+		? [...scenarios.map((s) => ({ depth: 2, slug: s.id, text: s.title })), ...own]
+		: own;
+---
+<Docs slug={entry.id} title={entry.data.title} description={entry.data.description} source={entry.data.source} draft={entry.data.draft} headings={headings}>
+	<Content components={{ Callout, Card, Cards }} />
+</Docs>

@@ -1,0 +1,54 @@
+---
+title: "Contributing"
+description: "How radiusward is built and tested, the rules every change follows, and how to contribute a change."
+source: "CONTRIBUTING.md"
+---
+
+radiusward is developed in the open on
+<a href="https://github.com/radiusward/radiusward-server">GitHub ↗</a> under the Apache-2.0 licence. The repository
+holds the code, the design decisions as ADRs, the tests and their results. Issues and pull requests are welcome;
+by contributing you agree that your contribution is licensed under Apache-2.0.
+
+## Build
+
+- **JDK 25.** The EAP key material needs the TLS exporter API that arrived in Java 25.
+- **No Docker needed** for the build and the unit, integration and end-to-end tests. Docker is needed only for the
+  image, the Compose stack and the fault-injection tests.
+
+```bash
+./mvnw verify                 # build, unit and integration tests, coverage floors, format check
+./mvnw spotless:apply         # format and licence headers
+./mvnw -Pe2e verify           # end-to-end tests against separate processes
+./mvnw -Pinterop verify       # also against another RADIUS server installed locally
+scripts/run-local.sh start    # three members and two gateways on loopback, with a kill -9 demo
+```
+
+## The rules every change follows
+
+The project has a small number of rules that keep its guarantees true. They are enforced by tests where a test can:
+
+- **No allocation on the hot path.** Receiving, checking, extracting and answering a packet allocates nothing; a
+  test sends a million packets through the path and fails above 4 KB in total.
+- **Status codes, not exceptions, for bad input.** Malformed packets are dropped silently, as RADIUS requires.
+- **The cluster service is deterministic.** No wall clock, no I/O, no randomness, no iteration over hash-ordered
+  collections that affects the result — every member computes the same state.
+- **State-machine rule changes are versioned**, and the cluster activates a new version only once every member runs
+  it, so a rolling upgrade can never split the state.
+- **An Accounting-Response only after the commit.** There is no Accounting-Reject; on failure, silence.
+- **Sinks contain no RADIUS logic** and write idempotently.
+- **Plain JDBC and plain NIO**: no ORM, no network framework; the build refuses both.
+- **Tests and docs are part of every change.** Coverage floors per module are raised when a module gains tests and
+  never lowered; new decisions get an ADR.
+
+## Where to start
+
+- **An interoperability report** from a real NAS, access point or supplicant is the most valuable contribution
+  today: the project has tests against software implementations, not devices. A packet capture of an
+  accounting session from a device, anonymised, becomes a vendor fixture.
+- **The failure matrix and the test reports** show what is covered; a scenario that is missing is a good issue.
+- **Documentation** that was unclear to you as a reader: say so, or fix it in the same place the code lives.
+
+The full guide — module map, conventions, how fixtures and dictionaries are maintained — is
+<a href="https://github.com/radiusward/radiusward-server/blob/main/CONTRIBUTING.md">CONTRIBUTING.md ↗</a>. The
+website itself is a separate repository, <a href="https://github.com/radiusward/radiusward.github.io">radiusward.github.io ↗</a>;
+its text is under CC BY 4.0, and every page has an "Edit this page" link.

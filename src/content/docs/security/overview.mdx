@@ -1,0 +1,62 @@
+---
+title: "Security and limitations"
+description: "How to report a vulnerability, which versions get fixes, the defaults that protect a deployment and how to harden it, and the limits the project states openly."
+source: "SECURITY.md"
+---
+
+## Reporting a vulnerability
+
+Please do not open a public issue. Use GitHub's private
+<a href="https://github.com/radiusward/radiusward-server/security/advisories/new">Report a vulnerability ↗</a> form on
+the server repository. Helpful to include: the affected version or commit, the configuration involved, steps or
+packets to reproduce, and what an attacker gains.
+
+You get an answer within 7 days and an assessment with a plan for a fix within 30. The fix is released before the
+advisory is published; the disclosure date is agreed with you, and you are credited unless you prefer otherwise.
+
+## Supported versions
+
+Until the first release, fixes go to `main` and the `edge` image. After it, the latest release receives security
+fixes.
+
+## In scope and out of scope
+
+**In scope:** anything that bypasses authentication or authorization, forges or replays accepted packets, reads or
+changes accounting records or the replicated state, loses acknowledged records, crashes or stalls a gateway or a
+member with crafted input, reaches the management API without its token, or recovers secrets or passwords.
+
+**Out of scope:** weaknesses of the RADIUS protocols themselves — the MD5-based authenticators and attribute hiding,
+DES in MS-CHAP, the MILENAGE functions of EAP-AKA — which radiusward implements as specified and mitigates as below;
+findings that need a NAS shared secret, a management token or access to the hosts; floods from addresses the NAS
+registry accepts, which gateways shed rather than queue.
+
+## Secure defaults and hardening
+
+| Area | Default | Advice |
+|---|---|---|
+| **Message-Authenticator** | required on Access-Requests (always with EAP); answers of home servers without it are ignored — the Blast-RADIUS mitigation | relax only for a NAS that cannot send it |
+| **Transport** | RADIUS over UDP relies on the shared secret | long random secrets, one per NAS; UDP RADIUS on trusted networks only; RadSec (TLS) or DTLS where devices support it |
+| **Management port** (`/health`, `/ready`, `/state`, `/metrics`, the CoA and reload APIs) | bound to `127.0.0.1`; the APIs exist only with a token of at least 16 characters | keep it on the monitoring network; never expose it |
+| **Secrets** | properties may read them from the environment (`${env:NAS_SECRET}`) | keep secrets out of files and images; on Kubernetes the chart takes them from Secrets |
+| **Stored passwords** | every common format is verified; weak legacy hashes are accepted for migration | prefer yescrypt, bcrypt, SHA-crypt or PBKDF2; cleartext and NT hashes only where CHAP or MS-CHAP require them |
+| **Rejects** | held back one second | slows password guessing without blocking a worker |
+| **Input** | malformed or unauthentic packets are dropped silently; the decoder is fuzz-tested | — |
+| **Images** | non-root, with an SBOM and build provenance | pin the version you evaluated |
+
+## Known limitations
+
+Stated so that nobody has to discover them:
+
+- **No independent security audit** has been done. Evidence comes from the project's own tests.
+- **No device certifications.** Interoperability is tested against software implementations (`eapol_test`,
+  `radsecproxy`, Samba AD, another RADIUS server), not against named NAS hardware or firmware.
+- **Active Directory over Netlogon is tested against Samba AD only**, not yet against a Windows domain controller.
+- **EAP-SIM/AKA use local SIM keys**: subscribers are store entries with their keys, which suits a private network
+  that holds them. There is no integration with an operator's subscriber platform (HSS/HLR), and only the Milenage
+  algorithms are implemented.
+- **Vendor packet fixtures are synthetic.** The bundled dictionaries decode the attributes; representative packets
+  captured from devices are still wanted.
+- **Durability is claimed for Linux**, where fsync reaches the disk; macOS does not flush the drive cache.
+- **No commercial support** exists yet.
+
+The full policy, with the response times and scope above: <a href="https://github.com/radiusward/radiusward-server/blob/main/SECURITY.md">SECURITY.md ↗</a>.

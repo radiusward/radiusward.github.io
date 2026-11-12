@@ -1,0 +1,51 @@
+---
+// Copyright 2026 The radiusward Authors
+// SPDX-License-Identifier: Apache-2.0
+import { REPO, REPORTS, RELEASE, RELEASE_URL } from '../consts';
+---
+<footer class="site-footer">
+	<div class="container footer-grid">
+		<div class="footer-brand">
+			<strong>radiusward</strong>
+			<p>An open-source RADIUS server with replicated accounting.</p>
+			<p class="small"><a href={RELEASE_URL}>{RELEASE.label} {RELEASE.tag}</a></p>
+		</div>
+		<nav aria-label="Product">
+			<strong>Product</strong>
+			<a href="/product/">Overview</a>
+			<a href="/docs/start/fit/">Is it a fit?</a>
+			<a href="/docs/start/quickstart/">Quickstart</a>
+		</nav>
+		<nav aria-label="Reliability">
+			<strong>Reliability</strong>
+			<a href="/docs/reliability/accounting-contract/">Accounting contract</a>
+			<a href="/docs/reliability/failure-behaviour/">Failure behaviour</a>
+			<a href={`${REPORTS}/`}>Test reports ↗</a>
+		</nav>
+		<nav aria-label="Project">
+			<strong>Project</strong>
+			<a href={REPO}>GitHub ↗</a>
+			<a href={`${REPO}/releases`}>Releases ↗</a>
+			<a href="/docs/security/overview/">Security</a>
+			<a href="/docs/community/contributing/">Contributing</a>
+		</nav>
+	</div>
+	<div class="container footer-legal">
+		Code under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>; text and images under{' '}
+		<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. No cookies, no tracking.
+	</div>
+</footer>
+<style>
+	.site-footer { margin-top: var(--space-16); border-top: 1px solid var(--color-divider); padding-block: var(--space-10) var(--space-8); font-size: var(--text-sm); }
+	.footer-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: var(--space-8); }
+	.footer-brand p { margin-top: var(--space-2); color: var(--color-text-muted); max-width: 32ch; }
+	.small { font-size: var(--text-xs); }
+	.small a { color: var(--color-primary); }
+	nav { display: grid; align-content: start; gap: var(--space-2); }
+	nav strong, .footer-brand strong { font-size: var(--text-sm); margin-bottom: var(--space-1); }
+	nav a { color: var(--color-text-muted); }
+	nav a:hover { color: var(--color-primary); }
+	.footer-legal { margin-top: var(--space-8); padding-top: var(--space-5); border-top: 1px solid var(--color-divider); color: var(--color-text-faint); font-size: var(--text-xs); }
+	.footer-legal a { text-decoration: underline; text-underline-offset: 0.2em; }
+	@media (max-width: 760px) { .footer-grid { grid-template-columns: 1fr 1fr; } .footer-brand { grid-column: 1 / -1; } }
+</style>

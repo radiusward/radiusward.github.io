@@ -1,0 +1,72 @@
+---
+title: "Choosing an authentication method"
+description: "From the credentials and clients you have to the method and identity store that fit: certificates, passwords in different formats, Active Directory, SIM cards, a second factor — and which combinations radiusward has tested with real clients."
+source: "docs/configuration.md"
+---
+
+An authentication method is a three-way agreement: what the **client** can do, what **credential** you hold for the
+user, and what the **method** needs to verify it. Most trouble in RADIUS deployments comes from a pair that cannot
+work — a password hash that a challenge-response method cannot use, for example. This page starts from what you have.
+
+## Start from your credentials
+
+| You hold | Methods that can verify it | Notes |
+|---|---|---|
+| **Client certificates** (your own CA) | EAP-TLS; PEAP, TTLS and TEAP with an inner certificate | the strongest option for Wi-Fi and wired 802.1X; the server also needs a certificate |
+| **Cleartext passwords** (users file, SQL) | everything: PAP, CHAP, MS-CHAPv1/v2, EAP-MD5, PEAP, TTLS, TEAP, EAP-pwd | the store must opt in to CHAP (`chap`) and MS-CHAP (`mschap`) use of its cleartext |
+| **NT hashes** | MS-CHAPv1/v2 (also inside PEAP and TTLS), EAP-pwd | no opt-in needed; what Windows-style systems export |
+| **Salted or slow hashes** — bcrypt, SHA-crypt, yescrypt, PBKDF2, SSHA | PAP; inside a tunnel: TTLS with PAP, PEAP or TEAP with GTC, TEAP basic | the server can only check a hash by hashing the password it was given, so the password must arrive in the clear (over UDP: PAP; over EAP: inside TLS) |
+| **Weak legacy hashes** — MD5, SHA-1, unsalted SHA-2, LM, MD5-crypt | the same as above | accepted for migrating old databases; store new passwords as yescrypt, bcrypt, SHA-crypt or PBKDF2 |
+| **An Active Directory** | PAP by LDAP bind; MS-CHAPv1/v2 and PAP over Netlogon, so PEAP with MS-CHAPv2 works | see below |
+| **SIM cards** with their keys | EAP-SIM, EAP-AKA, EAP-AKA′ | subscribers are store entries by IMSI with `SIM-Ki` and `SIM-OPc`; Milenage |
+| **A TOTP secret** as a second factor | after any password method: an Access-Challenge for the code, or the code appended to the password | `TOTP-Secret` in the user's check items |
+
+Not supported: argon2 hashes — a user with only such a hash is rejected.
+
+## Then look at your clients
+
+| Clients | Typical method | Why |
+|---|---|---|
+| Managed laptops and phones with certificates | **EAP-TLS** | no password to phish; works with every modern supplicant |
+| Devices with a username and password on Wi-Fi or a switch port | **PEAP with MS-CHAPv2**, or **TTLS with PAP** when passwords are stored as hashes | PEAP/MS-CHAPv2 is what Windows and most phones expect; TTLS/PAP is the only tunnel that can check a bcrypt or SHA-crypt hash |
+| Windows machines with domain accounts | **PEAP/MS-CHAPv2 against Active Directory over Netlogon**, or EAP-TLS with machine certificates | TEAP can chain the machine and the user identity in one tunnel |
+| VPN concentrators, broadband gateways, captive portals | **PAP, CHAP or MS-CHAPv2 over UDP** | the NAS speaks plain RADIUS; use RadSec or DTLS between NAS and server where the network is not trusted |
+| Phones on a private LTE/5G network with Wi-Fi offload | **EAP-AKA′ / EAP-AKA**, EAP-SIM for old cards | pseudonyms and fast re-authentication are supported; the sequence numbers live in the cluster |
+| Clients that support neither certificates nor MS-CHAP | **EAP-pwd**, or **EAP-GTC** inside PEAP or TEAP | EAP-pwd needs a cleartext password or an NT hash |
+
+<Callout type="note" title="One tunnel per deployment is enough">
+The gateways offer the methods in `auth.eap.methods` in your order of preference, and a client may choose another
+listed one. Most deployments do well with EAP-TLS for managed devices and one password tunnel — PEAP or TTLS — for
+the rest.
+</Callout>
+
+## Identity stores
+
+| Store | Holds | Verifies |
+|---|---|---|
+| **Users file** | users with check and reply items, groups | every password format above; reloads on change |
+| **SQL** (`radcheck` layout) | the same, in the tables many existing deployments already have | every password format above |
+| **LDAP / Active Directory** | users, groups (nested too), per-group policies | PAP by binding as the user; attributes from the directory as reply items |
+| **Active Directory over Netlogon** | — (a verifier, used with a store) | MS-CHAPv1/v2 and PAP against the domain controllers, in pure Java — no Samba, no domain join on the gateway hosts |
+
+Stores are asked in order; the first that knows the user decides. A NAS entry can use its own list of stores.
+
+Policy applies on top of any store: check and reply items, groups, Simultaneous-Use across all gateways, login
+time windows, expiry, usage counters, IPv4 and IPv6 address pools, Chargeable-User-Identity, and a small rules
+language for the final accept.
+
+## What has been tested with real clients
+
+Protocol implemented is not the same as proven against a client. This is the evidence per method:
+
+| Method | Evidence |
+|---|---|
+| EAP-TLS, PEAP (MS-CHAPv2, GTC, inner TLS), TTLS (PAP, CHAP, MS-CHAP, inner EAP), TEAP, EAP-pwd, session resumption | interoperability tests with `eapol_test` from wpa_supplicant 2.10, in CI on every change; compared against another RADIUS server with the same client profiles |
+| EAP-AKA, EAP-AKA′, EAP-SIM | `eapol_test` with its SIM/USIM simulator |
+| PAP, CHAP, MS-CHAPv2 over UDP | the project's own client, a differential test against an independent RADIUS library, and another server implementation |
+| PEAP and TTLS against Active Directory over Netlogon | Samba AD in CI; **not yet against a Windows domain controller** |
+| LDAP store and bind | Samba AD in CI |
+| Real NAS hardware and phones | **not yet** — no device or firmware has been tested by the project |
+
+The server repository's configuration reference lists every key for stores, certificates, revocation checks, EAP
+settings and policy: <a href="https://github.com/radiusward/radiusward-server/blob/main/docs/configuration.md#identity-stores">configuration.md ↗</a>.

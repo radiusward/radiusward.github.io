@@ -1,0 +1,174 @@
+---
+title: "Quickstart: your first accounting request"
+description: "Run three cluster members and two gateways with Docker Compose, send a session's Start, Interim and Stop, watch a retransmission being counted once, see the records in PostgreSQL, kill the leader under load, and clean up."
+source: "docs/operations/docker.md"
+---
+
+In about ten minutes you will have a radiusward cluster on your machine, send it a session's accounting records
+through both gateways, and see where they end up. At the end you can kill the leader while it carries load and check
+that nothing acknowledged was lost.
+
+<Callout type="caution" title="A local evaluation, not a production template">
+The stack uses demo secrets and demo users, listens on your machine only, and keeps its data in Docker volumes. Every
+command below was run as written against release `v0.1.0-rc.1`.
+</Callout>
+
+## 1. Prerequisites
+
+- **Docker** with the Compose plugin (`docker compose version` prints a version). On macOS, Docker Desktop or Colima
+  both work; with the older standalone `docker-compose`, write `docker-compose` instead of `docker compose`.
+- **About 2 GB of free memory** for six containers: three members, two gateways and PostgreSQL.
+- **Ports 1812–1815/udp** free on your machine (the gateways publish them); the management ports stay on
+  `127.0.0.1`.
+- **Git**, to get the Compose file and its configuration from the server repository.
+
+## 2. Get the Compose stack
+
+```bash
+git clone --depth 1 --branch v0.1.0-rc.1 https://github.com/radiusward/radiusward-server.git
+cd radiusward-server
+export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+```
+
+`RADIUSWARD_IMAGE` makes Compose pull the released image from GitHub's registry instead of expecting a locally
+built one. The configuration the stack uses is in `deploy/compose/config/`: one NAS entry for the Compose network with
+the secret `testing123`, a users file with two demo users, and a PostgreSQL sink.
+
+## 3. Start it
+
+```bash
+docker compose -f deploy/compose/compose.yaml up -d --wait
+```
+
+`--wait` returns once every container reports healthy — on a laptop about 10 seconds after the image is pulled.
+Then look at the cluster:
+
+```bash
+docker compose -f deploy/compose/compose.yaml ps
+curl -s localhost:9090/ready; echo
+curl -s localhost:9091/ready; echo
+curl -s localhost:9092/ready; echo
+```
+
+Each member answers with its role, for example `{"status":"UP","detail":"FOLLOWER, leader 2"}` — two followers and
+one leader. Which member leads is decided by the election and differs from run to run.
+
+## 4. Send a session
+
+A NAS reports a session as a **Start**, **Interim** updates while it runs, and a **Stop**. The `tools` service runs
+`radclient`, a test client, inside the stack's network — the NAS entry accepts only that network, so requests from
+your machine's own address get no answer, by design.
+
+```bash
+alias rad='docker compose -f deploy/compose/compose.yaml run --rm tools'
+
+rad acct --server gateway-a:1813 --secret testing123 --status start --session-id s1 --user alice
+rad acct --server gateway-a:1813 --secret testing123 --status interim --session-id s1 --user alice \
+    --attr Acct-Session-Time=60 --attr Acct-Input-Octets=1000
+rad acct --server gateway-a:1813 --secret testing123 --status stop --session-id s1 --user alice \
+    --attr Acct-Session-Time=120 --attr Acct-Input-Octets=2000 --attr Acct-Terminate-Cause=User-Request
+```
+
+Each command prints the request it sent and ends with:
+
+```text
+Received Accounting-Response id=59 length=20
+Response authenticator OK, attempt 1, 15 ms
+```
+
+That response was sent **after** the record was written to disk on two of the three members. The round trip of about
+10–15 ms on a laptop includes the replication and the fsync.
+
+## 5. Send a retransmission
+
+A NAS that gets no answer in time sends the same record again — sometimes to its secondary server. Send the Start of
+`s1` once more, through the other gateway:
+
+```bash
+rad acct --server gateway-b:1813 --secret testing123 --status start --session-id s1 --user alice
+```
+
+It is acknowledged like the first one. Now look at what the cluster counted:
+
+```bash
+curl -s localhost:9090/metrics | grep ^radiusward_accounting_events_total
+```
+
+```text
+radiusward_accounting_events_total{member="0",outcome="applied"} 3
+radiusward_accounting_events_total{member="0",outcome="duplicate"} 1
+radiusward_accounting_events_total{member="0",outcome="stale"} 0
+radiusward_accounting_events_total{member="0",outcome="rejected"} 0
+```
+
+Three records applied — Start, Interim, Stop — and one recognised as a duplicate, although it arrived through a
+different gateway. Ports 9091 and 9092 show the same numbers: every member computed the same state. The duplicate
+was not applied and will not be exported.
+
+## 6. Look at the state and the database
+
+`/state` on any member shows the replicated state's counters, the leader, and the export:
+
+```bash
+curl -s localhost:9090/state
+```
+
+Look for `"applied":3`, `"duplicates":1`, `"stoppedSessions":1`, and under `export` the PostgreSQL sink with
+`"exporting":true`. The sink is fed after the acknowledgement; normally it is caught up within a second:
+
+```bash
+docker compose -f deploy/compose/compose.yaml exec postgres psql -U radiusward radius \
+    -c "select username, acctsessionid, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets from radacct;"
+```
+
+```text
+ username | acctsessionid |     acctstarttime      |        acctstoptime        | acctsessiontime | acctinputoctets
+----------+---------------+------------------------+----------------------------+-----------------+-----------------
+ alice    | s1            | 2026-11-12 10:00:03+00 | 2026-11-12 10:00:04.308+00 |             120 |            2000
+```
+
+One row for the session, with the values of its last record. `radacct` is a view over radiusward's own
+`accounting_session` table, in the column layout most billing tools expect. `acctsessiontime` is what the NAS
+reported in the Stop (we claimed 120 s); the start and stop times are when the records arrived.
+
+## 7. Kill the leader under load
+
+This is what the cluster exists for. The demo script sends 10,000 sessions at 2,000 requests per second through both
+gateways, kills the leader's container with `SIGKILL` after 10 seconds, and then checks every acknowledged record
+against the replicated state and against PostgreSQL:
+
+```bash
+deploy/compose/demo-failover.sh
+```
+
+It takes about two minutes and ends with:
+
+```text
+sessions=10000
+lost=0
+```
+
+In the load generator's summary (`/tmp/radiusward-demo-load.txt`) you will see `sent 60000, acked 60000, failed 0,
+retransmissions 0`, and a p99 latency of about two seconds — the time the NAS waited while the two remaining members
+elected a new leader. The killed member is restarted and rejoins as a follower.
+
+## 8. Clean up
+
+```bash
+docker compose -f deploy/compose/compose.yaml down -v
+```
+
+`-v` also removes the data volumes. Without it, the next `up` continues with the same cluster and its records.
+
+## What you have seen
+
+- An Accounting-Response only after the record is committed on a majority — the [accounting contract](/docs/reliability/accounting-contract/).
+- A retransmission through the other gateway recognised and counted once.
+- The database fed afterwards, from the committed log — the export boundary.
+- A leader killed under load with nothing acknowledged lost.
+
+## Next
+
+- [First authentication](/docs/start/first-authentication/): an Access-Request with PAP, CHAP and MS-CHAPv2, and your own users.
+- [Failure behaviour](/docs/reliability/failure-behaviour/): what the leader kill did, and the other failures.
+- [Docker](/docs/deployment/docker/) for the stack in detail, and [Kubernetes](/docs/deployment/kubernetes/) for the Helm chart.
