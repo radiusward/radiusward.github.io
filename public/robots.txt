@@ -1,4 +1,4 @@
-# radiusward.io — everything on this site may be crawled, indexed, quoted and used for training.
+# radiusward.com — everything on this site may be crawled, indexed, quoted and used for training.
 # Text and images are published under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/);
 # the site's code under Apache-2.0. A summary for AI tools: /llms.txt
 
@@ -45,4 +45,4 @@ Allow: /
 User-agent: DuckAssistBot
 Allow: /
 
-Sitemap: https://radiusward.io/sitemap-index.xml
+Sitemap: https://radiusward.com/sitemap-index.xml

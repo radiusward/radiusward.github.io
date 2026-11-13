@@ -10,7 +10,7 @@ const drafts = new Set(draftPaths());
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://radiusward.io',
+	site: 'https://radiusward.com',
 	trailingSlash: 'always',
 	integrations: [mdx(), sitemap({ filter: (page) => !drafts.has(new URL(page).pathname) })],
 	markdown: {

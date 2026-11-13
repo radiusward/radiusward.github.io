@@ -6,7 +6,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SITE = 'https://radiusward.io';
+const SITE = 'https://radiusward.com';
 const dist = 'dist';
 const problems = [];
 const read = (p) => readFileSync(join(dist, p), 'utf8');
@@ -76,7 +76,7 @@ if (!existsSync(join(dist, 'llms.txt'))) problems.push('llms.txt missing');
 else {
 	const llms = read('llms.txt');
 	if (!llms.startsWith('# radiusward')) problems.push('llms.txt: does not start with the H1');
-	for (const [, url] of llms.matchAll(/\]\((https:\/\/radiusward\.io[^)]+)\)/g)) {
+	for (const [, url] of llms.matchAll(/\]\((https:\/\/radiusward\.com[^)]+)\)/g)) {
 		const path = url.slice(SITE.length);
 		if (!existsSync(path.endsWith('.txt') || path.endsWith('.xml') ? join(dist, path) : pageFile(path))) problems.push(`llms.txt: ${url} is not built`);
 	}
