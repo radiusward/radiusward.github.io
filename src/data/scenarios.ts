@@ -52,7 +52,7 @@ export const scenarios: Scenario[] = [
 		assumptions: 'The device buffers or retries its session records while there is no answer, as RADIUS devices do.',
 		recovery: 'Bring a member back. Once two members reach each other, the retries are confirmed and applied once. If their data is gone, see "Lost quorum".',
 		limits: 'This is the trade-off radiusward makes on purpose: consistency before availability for accounting. How long a device can buffer depends on its maker.',
-		evidence: 'End-to-end test: no confirmation without a majority, the retry applied once after recovery. A dedicated test that authentication continues without a majority is planned.',
+		evidence: 'End-to-end tests: no confirmation without a majority, the retry applied once after recovery; with one member left, logins are still accepted and rejected as before, and a user with a Simultaneous-Use limit is answered once a majority is back.',
 		source: { label: 'Failure matrix: no majority', href: MATRIX },
 	},
 	{
