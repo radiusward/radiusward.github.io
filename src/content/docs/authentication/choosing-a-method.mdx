@@ -35,7 +35,7 @@ Not supported: argon2 hashes — a user with only such a hash is rejected.
 | Clients that support neither certificates nor MS-CHAP | **EAP-pwd**, or **EAP-GTC** inside PEAP or TEAP | EAP-pwd needs a cleartext password or an NT hash |
 
 <Callout type="note" title="One tunnel per deployment is enough">
-The gateways offer the methods in `auth.eap.methods` in your order of preference, and a client may choose another
+The RADIUS servers offer the methods in `auth.eap.methods` in your order of preference, and a client may choose another
 listed one. Most deployments do well with EAP-TLS for managed devices and one password tunnel — PEAP or TTLS — for
 the rest.
 </Callout>
@@ -47,11 +47,11 @@ the rest.
 | **Users file** | users with check and reply items, groups | every password format above; reloads on change |
 | **SQL** (`radcheck` layout) | the same, in the tables many existing deployments already have | every password format above |
 | **LDAP / Active Directory** | users, groups (nested too), per-group policies | PAP by binding as the user; attributes from the directory as reply items |
-| **Active Directory over Netlogon** | — (a verifier, used with a store) | MS-CHAPv1/v2 and PAP against the domain controllers, in pure Java — no Samba, no domain join on the gateway hosts |
+| **Active Directory over Netlogon** | — (a verifier, used with a store) | MS-CHAPv1/v2 and PAP against the domain controllers, in pure Java — no Samba, no domain join on the RADIUS server hosts |
 
 Stores are asked in order; the first that knows the user decides. A NAS entry can use its own list of stores.
 
-Policy applies on top of any store: check and reply items, groups, Simultaneous-Use across all gateways, login
+Policy applies on top of any store: check and reply items, groups, Simultaneous-Use across all RADIUS servers, login
 time windows, expiry, usage counters, IPv4 and IPv6 address pools, Chargeable-User-Identity, and a small rules
 language for the final accept.
 

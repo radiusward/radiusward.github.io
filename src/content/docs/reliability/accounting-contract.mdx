@@ -16,7 +16,7 @@ The record has been appended to the replicated log and **written to disk with fs
 (two of three members). It survives the loss of any single member, including a power loss of that member.
 </Callout>
 
-The gateway sends the response only after the cluster reports the record **committed**. Not after it was queued
+The RADIUS server sends the response only after the cluster reports the record **committed**. Not after it was queued
 locally, not after a network send succeeded, and not after a single member received it.
 
 What the guarantee assumes:
@@ -51,7 +51,7 @@ RADIUS has no "Accounting-Reject". When radiusward cannot promise the record is 
 retransmits — which NAS devices do by design. It stays silent when:
 
 - the packet is malformed, comes from an address that is not a configured NAS, or its authenticator does not verify;
-- a gateway's queue is full (it sheds load instead of blocking);
+- a RADIUS server's queue is full (it sheds load instead of blocking);
 - **no majority of the cluster is reachable**, or a leader election is in progress;
 - writing to disk fails;
 - a required sink is further behind than its limit.
@@ -65,11 +65,11 @@ until a majority is back — consistency before availability, on purpose.
 ## Retransmissions and duplicates
 
 A NAS that got no answer cannot know whether its record was committed, so it retries — possibly after a leader
-failover, and possibly through the other gateway. radiusward recognises a retry at two levels:
+failover, and possibly through the other RADIUS server. radiusward recognises a retry at two levels:
 
 | Level | Recognises | By |
 |---|---|---|
-| Gateway response cache | an identical retransmission to the same gateway | source address and port, RADIUS Identifier, Request Authenticator |
+| RADIUS server response cache | an identical retransmission to the same RADIUS server | source address and port, RADIUS Identifier, Request Authenticator |
 | Cluster | the same accounting event, whichever way it arrives | NAS identity, `Acct-Session-Id`, `Acct-Status-Type`, and `Acct-Session-Time` or `Event-Timestamp` |
 
 A duplicate is answered with an Accounting-Response like the original and is **not applied or exported a second
@@ -93,7 +93,7 @@ the session.
 
 <Cards>
 	<Card title="Tolerated without losing acknowledged records">
-		One cluster member lost (crash, power loss, disk loss) · any number of gateways lost · network partitions that
+		One cluster member lost (crash, power loss, disk loss) · any number of RADIUS servers lost · network partitions that
 		leave a majority connected · sink outages up to their lag limit.
 	</Card>
 	<Card title="Not tolerated">
@@ -117,7 +117,7 @@ the session.
 Every statement on this page maps to an automated test in the{' '}
 <a href={`${DOCS}/testing/failure-matrix.md`}>failure matrix</a> — for example: no acknowledgement without a
 majority, and the retry applied once after recovery; the leader killed under load with every acknowledged record
-kept; a gateway killed between commit and response, with the retry through the other gateway applied once. The
+kept; a RADIUS server killed between commit and response, with the retry through the other RADIUS server applied once. The
 results are published as <a href={`${REPORTS}/`}>test reports</a>: fault injection on Linux nightly (power loss with
 LazyFS, partitions, full disks), the Kubernetes scenarios nightly, end-to-end and integration tests on every change.
 

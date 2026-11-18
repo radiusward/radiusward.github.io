@@ -1,6 +1,6 @@
 ---
 title: "Failure behaviour"
-description: "Leader failure, gateway failure, loss of the majority, a sink outage, a lost disk and a lost quorum: what pauses, what retries, what recovers, and what each assumes."
+description: "Leader failure, RADIUS server failure, loss of the majority, a sink outage, a lost disk and a lost quorum: what pauses, what retries, what recovers, and what each assumes."
 source: "docs/testing/failure-matrix.md"
 ---
 
@@ -17,8 +17,8 @@ records and retries, which is what RADIUS clients are built to do. What it never
 record that is later lost.
 </Callout>
 
-The scenarios: [the leader is killed](#leader) · [a gateway fails](#gateway) · [the majority is lost](#majority) ·
-[a sink is down](#sink) · [a server loses its disk](#disk) · [two servers are lost](#quorum).
+The scenarios: [the leader is killed](#leader) · [a RADIUS server fails](#server) · [the majority is lost](#majority) ·
+[a sink is down](#sink) · [a member loses its disk](#disk) · [two members are lost](#quorum).
 
 <ScenarioList />
 

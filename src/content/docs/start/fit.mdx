@@ -13,7 +13,7 @@ depends on what your accounting records are worth to you.
   records of the last seconds before a crash — or counting them twice after a failover — is a real problem.
 - **You want to verify before you trust.** The [accounting contract](/docs/reliability/accounting-contract/), the
   [failure scenarios](/reliability/) and the tests behind them are published, and you can run them yourself.
-- **You can run three members and two gateways.** On Kubernetes that is a Helm release; on hosts, five services.
+- **You can run three members and two RADIUS servers.** On Kubernetes that is a Helm release; on hosts, five services.
 - **You run Java infrastructure**, or want extension points in Java: identity stores and export destinations are
   plug-ins.
 
@@ -32,10 +32,10 @@ depends on what your accounting records are worth to you.
 
 | | |
 |---|---|
-| Processes | three cluster members and at least two gateways |
+| Processes | three cluster members and at least two RADIUS servers |
 | Memory | about 1 GiB per member in the small profile, which holds two million sessions |
 | Disk | each member keeps the replicated log and snapshots; fsync is on |
-| Network | members reach each other directly; each NAS is configured with two gateways |
+| Network | members reach each other directly; each NAS is configured with two RADIUS servers |
 | Operations | metrics, dashboards and alert rules come with it; a continuous backup runs outside the cluster |
 
 ## Not sure?

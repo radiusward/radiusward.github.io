@@ -16,10 +16,10 @@ The server repository runs its slower test suites in CI and publishes the result
 
 | Report | Runs | What it proves |
 |---|---|---|
-| <a href={`${REPORTS}/integration/`}>Integration ↗</a> | on every change to `main` | gateways, cluster members and identity stores together in one JVM: the state machine, deduplication, snapshots, authentication methods, EAP against `eapol_test`, RadSec and DTLS against `radsecproxy`, LDAP and Netlogon against Samba AD |
-| <a href={`${REPORTS}/e2e/`}>End-to-end ↗</a> | on every change | separate radiusward processes: an acknowledgement only after the commit, no acknowledgement without a majority, the leader killed under load, a gateway killed between commit and response, retransmissions, a rolling upgrade |
+| <a href={`${REPORTS}/integration/`}>Integration ↗</a> | on every change to `main` | RADIUS servers, cluster members and identity stores together in one JVM: the state machine, deduplication, snapshots, authentication methods, EAP against `eapol_test`, RadSec and DTLS against `radsecproxy`, LDAP and Netlogon against Samba AD |
+| <a href={`${REPORTS}/e2e/`}>End-to-end ↗</a> | on every change | separate radiusward processes: an acknowledgement only after the commit, no acknowledgement without a majority, the leader killed under load, a RADIUS server killed between commit and response, retransmissions, a rolling upgrade |
 | <a href={`${REPORTS}/linux/`}>Fault injection ↗</a> | nightly, in containers on Linux | power loss of all three members with LazyFS (a file system that loses what was not fsynced), network partitions, a full disk, overload with 2 million sessions in 1 GiB, a PostgreSQL outage, a blocking and a detached sink, systemd failover |
-| <a href={`${REPORTS}/k8s/`}>Kubernetes ↗</a> | nightly, on kind with the Helm chart | under accounting and authentication load through a load balancer: the leader killed, members and gateways rolled, a member's volume replaced, a lost quorum restored from the backup; opt-in: 500,000 sessions with a node drained |
+| <a href={`${REPORTS}/k8s/`}>Kubernetes ↗</a> | nightly, on kind with the Helm chart | under accounting and authentication load through a load balancer: the leader killed, members and RADIUS servers rolled, a member's volume replaced, a lost quorum restored from the backup; opt-in: 500,000 sessions with a node drained |
 
 Each report is an Allure report: every test with its steps, how long it took, and its outcome over the last 30
 runs, so a failure that comes and goes is visible as such.
@@ -37,10 +37,10 @@ in every environment by one harness:
   not radiusward's limit.
 - **A leader kill** at 70 % of the accounting ceiling, measuring what was lost (nothing, so far), retransmissions and
   the longest wait.
-- **CPU and memory per process** at the ceiling, and the gateway's packet path on one core from JMH.
+- **CPU and memory per process** at the ceiling, and the RADIUS server's packet path on one core from JMH.
 
-The weekly run on a GitHub runner is a **trend**, not a capacity figure: three members, two gateways, PostgreSQL and
-the generators share four vCPUs, and each member and gateway is limited to one CPU. The ceilings per profile on
+The weekly run on a GitHub runner is a **trend**, not a capacity figure: three members, two RADIUS servers, PostgreSQL and
+the generators share four vCPUs, and each member and RADIUS server is limited to one CPU. The ceilings per profile on
 dedicated machines are measured on AWS, with the generators on their own instances; those results appear on the same
 pages as `aws-small` and `aws-standard` once they exist.
 

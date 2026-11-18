@@ -1,11 +1,11 @@
 ---
 title: "Quickstart: your first accounting request"
-description: "Run three cluster members and two gateways with Docker Compose, send a session's Start, Interim and Stop, watch a retransmission being counted once, see the records in PostgreSQL, kill the leader under load, and clean up."
+description: "Run three cluster members and two RADIUS servers with Docker Compose, send a session's Start, Interim and Stop, watch a retransmission being counted once, see the records in PostgreSQL, kill the leader under load, and clean up."
 source: "docs/operations/docker.md"
 ---
 
 In about ten minutes you will have a radiusward cluster on your machine, send it a session's accounting records
-through both gateways, and see where they end up. At the end you can kill the leader while it carries load and check
+through both RADIUS servers, and see where they end up. At the end you can kill the leader while it carries load and check
 that nothing acknowledged was lost.
 
 <Callout type="caution" title="A local evaluation, not a production template">
@@ -17,8 +17,8 @@ command below was run as written against release `v0.1.0-rc.1`.
 
 - **Docker** with the Compose plugin (`docker compose version` prints a version). On macOS, Docker Desktop or Colima
   both work; with the older standalone `docker-compose`, write `docker-compose` instead of `docker compose`.
-- **About 2 GB of free memory** for six containers: three members, two gateways and PostgreSQL.
-- **Ports 1812–1815/udp** free on your machine (the gateways publish them); the management ports stay on
+- **About 2 GB of free memory** for six containers: three members, two RADIUS servers and PostgreSQL.
+- **Ports 1812–1815/udp** free on your machine (the RADIUS servers publish them); the management ports stay on
   `127.0.0.1`.
 - **Git**, to get the Compose file and its configuration from the server repository.
 
@@ -62,10 +62,10 @@ your machine's own address get no answer, by design.
 ```bash
 alias rad='docker compose -f deploy/compose/compose.yaml run --rm tools'
 
-rad acct --server gateway-a:1813 --secret testing123 --status start --session-id s1 --user alice
-rad acct --server gateway-a:1813 --secret testing123 --status interim --session-id s1 --user alice \
+rad acct --server server-a:1813 --secret testing123 --status start --session-id s1 --user alice
+rad acct --server server-a:1813 --secret testing123 --status interim --session-id s1 --user alice \
     --attr Acct-Session-Time=60 --attr Acct-Input-Octets=1000
-rad acct --server gateway-a:1813 --secret testing123 --status stop --session-id s1 --user alice \
+rad acct --server server-a:1813 --secret testing123 --status stop --session-id s1 --user alice \
     --attr Acct-Session-Time=120 --attr Acct-Input-Octets=2000 --attr Acct-Terminate-Cause=User-Request
 ```
 
@@ -82,10 +82,10 @@ That response was sent **after** the record was written to disk on two of the th
 ## 5. Send a retransmission
 
 A NAS that gets no answer in time sends the same record again — sometimes to its secondary server. Send the Start of
-`s1` once more, through the other gateway:
+`s1` once more, through the other server:
 
 ```bash
-rad acct --server gateway-b:1813 --secret testing123 --status start --session-id s1 --user alice
+rad acct --server server-b:1813 --secret testing123 --status start --session-id s1 --user alice
 ```
 
 It is acknowledged like the first one. Now look at what the cluster counted:
@@ -102,7 +102,7 @@ radiusward_accounting_events_total{member="0",outcome="rejected"} 0
 ```
 
 Three records applied — Start, Interim, Stop — and one recognised as a duplicate, although it arrived through a
-different gateway. Ports 9091 and 9092 show the same numbers: every member computed the same state. The duplicate
+different RADIUS server. Ports 9091 and 9092 show the same numbers: every member computed the same state. The duplicate
 was not applied and will not be exported.
 
 ## 6. Look at the state and the database
@@ -134,7 +134,7 @@ reported in the Stop (we claimed 120 s); the start and stop times are when the r
 ## 7. Kill the leader under load
 
 This is what the cluster exists for. The demo script sends 10,000 sessions at 2,000 requests per second through both
-gateways, kills the leader's container with `SIGKILL` after 10 seconds, and then checks every acknowledged record
+RADIUS servers, kills the leader's container with `SIGKILL` after 10 seconds, and then checks every acknowledged record
 against the replicated state and against PostgreSQL:
 
 ```bash
@@ -163,7 +163,7 @@ docker compose -f deploy/compose/compose.yaml down -v
 ## What you have seen
 
 - An Accounting-Response only after the record is committed on a majority — the [accounting contract](/docs/reliability/accounting-contract/).
-- A retransmission through the other gateway recognised and counted once.
+- A retransmission through the other RADIUS server recognised and counted once.
 - The database fed afterwards, from the committed log — the export boundary.
 - A leader killed under load with nothing acknowledged lost.
 

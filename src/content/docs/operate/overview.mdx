@@ -13,10 +13,10 @@ before an evaluation becomes production.
 
 | Platform | Guide | What it gives you |
 |---|---|---|
-| Kubernetes | [Kubernetes](/docs/deployment/kubernetes/) | the Helm chart: members with their own volumes, gateways with their own addresses, the backup, dashboards and alert rules; tested nightly under failures |
+| Kubernetes | [Kubernetes](/docs/deployment/kubernetes/) | the Helm chart: members with their own volumes, RADIUS servers with their own addresses, the backup, dashboards and alert rules; tested nightly under failures |
 | Docker | [Docker](/docs/deployment/docker/) | a Compose stack for evaluation and small sites |
 | Amazon ECS | <a href={`${DOCS}/operations/aws-ecs.md`}>aws-ecs.md ↗</a> | example CloudFormation and Terraform templates on Graviton — validated, not yet deployed by the project |
-| Hosts with systemd | <a href={`${DOCS}/operations/bare-metal.md`}>bare-metal.md ↗</a> | units for members, gateways and the backup |
+| Hosts with systemd | <a href={`${DOCS}/operations/bare-metal.md`}>bare-metal.md ↗</a> | units for members, RADIUS servers and the backup |
 
 ## Watch the right signals
 
@@ -24,7 +24,7 @@ Every process exposes Prometheus metrics on its management port; five Grafana da
 with the project. The questions they answer:
 
 - **Is there a leader, and is it stable?** — no leader for 30 s, frequent elections, a member down.
-- **Do gateways reach the cluster, and do they shed load?** — a disconnected gateway, requests dropped because a queue
+- **Do RADIUS servers reach the cluster, and do they shed load?** — a disconnected RADIUS server, requests dropped because a queue
   is full.
 - **Are the sinks keeping up?** — export lag against the limit, a detached sink, sink errors.
 - **Is there room on disk?** — a member below its free-space limit reports not ready before the disk is full.
@@ -49,7 +49,7 @@ Replication is not a backup. Practise each procedure once before you need it:
 
 Restart the members with the new release one at a time, waiting until each is ready and all agree on the state before
 the next. A change to how records are applied takes effect only once every member runs the new release, at the same
-log position on all of them; until then a rollback is possible. Gateways can be upgraded in any order.
+log position on all of them; until then a rollback is possible. RADIUS servers can be upgraded in any order.
 <a href={`${DOCS}/operations/release.md`}>Upgrading a cluster ↗</a>
 
 ## Before production

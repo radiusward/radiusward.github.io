@@ -22,13 +22,13 @@ fixes.
 ## In scope and out of scope
 
 **In scope:** anything that bypasses authentication or authorization, forges or replays accepted packets, reads or
-changes accounting records or the replicated state, loses acknowledged records, crashes or stalls a gateway or a
+changes accounting records or the replicated state, loses acknowledged records, crashes or stalls a RADIUS server or a
 member with crafted input, reaches the management API without its token, or recovers secrets or passwords.
 
 **Out of scope:** weaknesses of the RADIUS protocols themselves — the MD5-based authenticators and attribute hiding,
 DES in MS-CHAP, the MILENAGE functions of EAP-AKA — which radiusward implements as specified and mitigates as below;
 findings that need a NAS shared secret, a management token or access to the hosts; floods from addresses the NAS
-registry accepts, which gateways shed rather than queue.
+registry accepts, which RADIUS servers shed rather than queue.
 
 ## Secure defaults and hardening
 

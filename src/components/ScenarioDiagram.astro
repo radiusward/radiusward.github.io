@@ -1,29 +1,29 @@
 ---
 // Copyright 2026 The radiusward Authors
 // SPDX-License-Identifier: Apache-2.0
-// A small picture of one failure scenario: the two gateways, the three members, and what is down or recovering.
+// A small picture of one failure scenario: the two RADIUS servers, the three cluster members, and what is down or recovering.
 type State = 'ok' | 'down' | 'leader' | 'seeding' | 'restored';
 interface Props {
-	gateways: [State, State];
+	servers: [State, State];
 	members: [State, State, State];
 	sink?: State;
 	acks: 'continue' | 'pause' | 'stop';
 	caption: string;
 }
-const { gateways, members, sink = 'ok', acks, caption } = Astro.props;
+const { servers, members, sink = 'ok', acks, caption } = Astro.props;
 const label: Record<State, string> = { ok: '', down: 'down', leader: 'leader', seeding: 'seeding', restored: 'restored' };
 const ackText = { continue: 'records keep being confirmed', pause: 'confirmations pause briefly', stop: 'records are not confirmed' }[acks];
 ---
 <figure class="scenario-diagram" aria-label={caption}>
 	<div class="row">
-		{gateways.map((s, i) => (
-			<div class={`box ${s}`}><strong>Gateway {i === 0 ? 'A' : 'B'}</strong>{label[s] && <small>{label[s]}</small>}</div>
+		{servers.map((s, i) => (
+			<div class={`box ${s}`}><strong>RADIUS server {i === 0 ? 'A' : 'B'}</strong>{label[s] && <small>{label[s]}</small>}</div>
 		))}
 	</div>
 	<div class={`ack ${acks}`}>{ackText}</div>
 	<div class="row three">
 		{members.map((s, i) => (
-			<div class={`box ${s}`}><strong>Server {i + 1}</strong>{label[s] && <small>{label[s]}</small>}</div>
+			<div class={`box ${s}`}><strong>Member {i + 1}</strong>{label[s] && <small>{label[s]}</small>}</div>
 		))}
 	</div>
 	<div class="row one">

@@ -14,7 +14,7 @@ export const GET: APIRoute = async ({ site }) => {
 		'',
 		'> radiusward is an open-source RADIUS server (Apache-2.0, Java) for Wi‑Fi, VPN and subscriber networks: it',
 		'> authenticates users and devices against a users file, SQL, LDAP or Active Directory, and stores every session',
-		'> record (RADIUS accounting) on two of three cluster servers before confirming it to the device, so a crash never',
+		'> record (RADIUS accounting) on two of three cluster members before confirming it to the device, so a crash never',
 		'> loses or double-counts a record. A failed leader is replaced in about two seconds.',
 		'',
 		`Everything on this site may be crawled, quoted and used for training; the text is CC BY 4.0. Source code and`,
@@ -24,7 +24,7 @@ export const GET: APIRoute = async ({ site }) => {
 		'',
 		`- [Home](${base}/): what radiusward is for, the problem with RADIUS accounting, what it works with`,
 		`- [Product](${base}/product/): logins, session records, operations, where it runs, fit and trade-offs`,
-		`- [Reliability](${base}/reliability/): what happens when a server, a gateway, the majority, a disk or a database fails`,
+		`- [Reliability](${base}/reliability/): what happens when a cluster member, a RADIUS server, the majority, a disk or a database fails`,
 		`- [Documentation](${base}/docs/): the documentation front page`,
 		'',
 	];

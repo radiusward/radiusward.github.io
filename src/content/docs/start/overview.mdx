@@ -16,16 +16,16 @@ A NAS reports every session with Accounting-Requests: a Start, Interim updates w
 Those records are what billing, usage limits and audits are built on. radiusward answers such a request only after
 the record has been **written to disk on two of three cluster members**. If any one member crashes — even loses
 power — nothing that was acknowledged is lost, and the NAS, which retries until it gets an answer, never has to be
-told twice. Retries that arrive after a failover, or through the other gateway, are recognised and counted once.
+told twice. Retries that arrive after a failover, or through the other RADIUS server, are recognised and counted once.
 
 The exact promise, its assumptions and its limits are in [the accounting contract](/docs/reliability/accounting-contract/).
 
-## Authentication on the gateways
+## Authentication on the RADIUS servers
 
-Access-Requests are decided by the **gateways**, the processes that hold the network sockets, from identity stores
+Access-Requests are decided by the **RADIUS servers**, the processes that hold the network sockets, from identity stores
 you already have: a users file, SQL, LDAP or Active Directory, or Active Directory over Netlogon. radiusward speaks
 PAP, CHAP, MS-CHAP and the EAP methods used for Wi-Fi and wired 802.1X — EAP-TLS, PEAP, TTLS, TEAP, EAP-pwd — and
-EAP-SIM, EAP-AKA and EAP-AKA′ for SIM cards. Only the state that every gateway must agree on — how many devices a user
+EAP-SIM, EAP-AKA and EAP-AKA′ for SIM cards. Only the state that every RADIUS server must agree on — how many devices a user
 has online, SIM sequence numbers — goes through the cluster.
 
 It carries RADIUS over UDP, TLS (RadSec), DTLS and TCP; forwards realms to other RADIUS servers (proxying); and sends
@@ -38,7 +38,7 @@ Change-of-Authorization and Disconnect requests to the NAS.
 		Hold the replicated accounting log and its state, built on Aeron Cluster with Raft consensus. Each also exports
 		the committed records to PostgreSQL, JSON-lines files or other RADIUS servers.
 	</Card>
-	<Card title="Two or more gateways">
+	<Card title="Two or more RADIUS servers">
 		Hold the sockets, check every packet, decide authentication, forward accounting to the cluster and answer after
 		the commit. They keep no state of their own that matters.
 	</Card>

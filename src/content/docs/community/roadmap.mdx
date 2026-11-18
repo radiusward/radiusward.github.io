@@ -11,7 +11,7 @@ radiusward was built in phases, each with a plan and a report in the server repo
 
 | | |
 |---|---|
-| **Accounting core** | the RADIUS codec, bundled vendor dictionaries, the replicated cluster with per-session deduplication and snapshots, gateways, a test client |
+| **Accounting core** | the RADIUS codec, bundled vendor dictionaries, the replicated cluster with per-session deduplication and snapshots, RADIUS servers, a test client |
 | **Containers and failover** | one image, the Compose stack, a leader replaced in about 2 seconds without NAS retransmissions, fault injection with power loss, partitions, full disks and overload |
 | **Export** | the exporter tailing the committed log, PostgreSQL and JSON-lines sinks, forwarding to other RADIUS servers, lag policy, log purge, metrics |
 | **Deployment** | the Helm chart with nightly chaos tests, systemd units, dashboards and alert rules, seeding of a replaced member, a continuous backup with restore after a lost quorum, example templates for Amazon ECS |

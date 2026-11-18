@@ -1,12 +1,12 @@
 ---
 title: "Docker"
-description: "The container image and the Docker Compose stack: three members, two gateways and PostgreSQL; memory profiles; what to know about addresses, /dev/shm, data and fsync; the backup and monitoring profiles."
+description: "The container image and the Docker Compose stack: three members, two RADIUS servers and PostgreSQL; memory profiles; what to know about addresses, /dev/shm, data and fsync; the backup and monitoring profiles."
 source: "docs/operations/docker.md"
 ---
 
 ## The image
 
-One image for every component — members, gateways, backup and the tools:
+One image for every component — members, RADIUS servers, backup and the tools:
 
 ```text
 ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
@@ -14,12 +14,12 @@ ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
 
 It is public, built for amd64 and arm64, runs as a non-root user, and ships with an SBOM and build provenance.
 `docker run --rm ghcr.io/radiusward/radiusward-server:0.1.0-rc.1 version` prints the version. The subcommands are
-`cluster-node`, `gateway`, `cluster-backup`, `cluster-restore`, `radclient`, `admin`, `probe` and `cluster-tool`.
+`cluster-node`, `server`, `cluster-backup`, `cluster-restore`, `radclient`, `admin`, `probe` and `cluster-tool`.
 
 ## The Compose stack
 
 The server repository's `deploy/compose/compose.yaml` runs the smallest complete cluster: three members, two
-gateways and PostgreSQL as the export destination, on one machine. The [quickstart](/docs/start/quickstart/) walks
+RADIUS servers and PostgreSQL as the export destination, on one machine. The [quickstart](/docs/start/quickstart/) walks
 through it; the short form:
 
 ```bash
@@ -31,12 +31,12 @@ docker compose -f deploy/compose/compose.yaml down -v      # -v deletes the data
 | Service | Address in the stack | On your machine |
 |---|---|---|
 | `node-0`, `node-1`, `node-2` | 172.28.0.10–12 | management `127.0.0.1:9090`–`9092` |
-| `gateway-a`, `gateway-b` | 172.28.0.20–21 | accounting `1813/udp` and `1814/udp`, authentication `1812/udp` and `1815/udp`, management `127.0.0.1:9190`–`9191` |
+| `server-a`, `server-b` | 172.28.0.20–21 | accounting `1813/udp` and `1814/udp`, authentication `1812/udp` and `1815/udp`, management `127.0.0.1:9190`–`9191` |
 | `postgres` | 172.28.0.40 | `127.0.0.1:5432`, database `radius`, user `radiusward` |
 | `tools` | — | `radclient` as the entrypoint; `admin` and `probe` with `--entrypoint radiusward` |
 
-Configuration lives in `deploy/compose/config/`: `cluster.properties`, `gateway.properties`, the NAS entry and the
-users file. Per-container values — the member id, the gateway id, its address, the NAS secret — come from the
+Configuration lives in `deploy/compose/config/`: `cluster.properties`, `server.properties`, the NAS entry and the
+users file. Per-container values — the member id, the RADIUS server id, its address, the NAS secret — come from the
 environment. The NAS secret defaults to `testing123`; set `NAS_SECRET` for anything else.
 
 ### Profiles
@@ -47,14 +47,14 @@ The stack runs the `small` profile by default; two overlay files switch to the l
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.standard.yaml up -d
 ```
 
-| Profile | Member | Gateway | `/dev/shm` of a member |
+| Profile | Member | RADIUS server | `/dev/shm` of a member |
 |---|---|---|---|
 | small (default) | 1 GiB, 1 CPU | 384 MiB | 512 MiB |
 | standard | 2 GiB, 2 CPU | 768 MiB | 1 GiB |
 | large | larger still; see `compose.large.yaml` | | |
 
 Measured with the small profile: 2 million sessions stay under 448 MiB of unreclaimable memory per member and
-321 MiB per gateway.
+321 MiB per RADIUS server.
 
 ## What to know
 
@@ -69,7 +69,7 @@ Measured with the small profile: 2 million sessions stay under 448 MiB of unrecl
 - **fsync stays on**: `archive.file.sync.level=2`. Anything lower can lose acknowledged records on power loss —
   measured, not assumed.
 - **Health checks** call `radiusward probe http://127.0.0.1:9090/ready`.
-- **A gateway reloads its configuration on `SIGHUP`**: `docker kill -s HUP <container>`.
+- **A RADIUS server reloads its configuration on `SIGHUP`**: `docker kill -s HUP <container>`.
 
 ## PostgreSQL export
 

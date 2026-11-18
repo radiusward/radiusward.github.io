@@ -49,8 +49,8 @@ const DOCS = `${REPO}/blob/main/docs`;
 				<p>A device's Start, Interim and Stop records are the usage you bill and the answer to "who had this address at 14:05". radiusward treats them accordingly.</p>
 			</div>
 			<dl>
-				<div><dt>Stored on three servers first</dt><dd>A record is confirmed to the device only after it is written to disk on two of the three cluster servers. A crash — even a power loss — of any one of them loses nothing that was confirmed.</dd></div>
-				<div><dt>Counted once</dt><dd>A device that retries, after a timeout or a failover, through either gateway, gets the same answer and the session is counted once. The rules are precise enough to be tested, and they are.</dd></div>
+				<div><dt>Stored on three servers first</dt><dd>A record is confirmed to the device only after it is written to disk on two of the three cluster members. A crash — even a power loss — of any one of them loses nothing that was confirmed.</dd></div>
+				<div><dt>Counted once</dt><dd>A device that retries, after a timeout or a failover, through either RADIUS server, gets the same answer and the session is counted once. The rules are precise enough to be tested, and they are.</dd></div>
 				<div><dt>Whole sessions</dt><dd>Start and Stop land in the same replicated state wherever they arrived; a lost Stop is closed by an idle timeout at the session's last record; a device restart (Accounting‑On/Off) closes its sessions.</dd></div>
 				<div><dt>Delivered to your database</dt><dd>PostgreSQL — one row per session in the column layout billing tools expect, optionally the full event history — JSON‑lines files, or forwarded to another RADIUS server. Written after the confirmation, exactly once, and buffered by the log while the database is down.</dd></div>
 				<div><dt>Stated, not implied</dt><dd>What a confirmation guarantees, when radiusward stays silent, and where the guarantee ends are written down and tested: <a href="/docs/reliability/accounting-contract/">the accounting contract</a>.</dd></div>
@@ -61,7 +61,7 @@ const DOCS = `${REPO}/blob/main/docs`;
 			<div>
 				<span class="eyebrow">Run it like your other services</span>
 				<h2>Built to be operated, not only installed.</h2>
-				<p>Three cluster servers and two or more gateways. What that costs you, and what it gives you back.</p>
+				<p>Three cluster members and two or more RADIUS servers. What that costs you, and what it gives you back.</p>
 			</div>
 			<dl>
 				<div><dt>Failover in seconds</dt><dd>A failed leader is replaced in about two seconds — within a device's retry window, so logins and records continue without anyone noticing.</dd></div>
@@ -80,8 +80,8 @@ const DOCS = `${REPO}/blob/main/docs`;
 			</div>
 			<div class="deploy">
 				<a href="/docs/deployment/docker/"><h3>Docker</h3><p>A complete cluster with Docker Compose in one command — the quickstart.</p></a>
-				<a href="/docs/deployment/kubernetes/"><h3>Kubernetes</h3><p>The Helm chart: members with their own volumes, gateways with their own addresses, the backup, dashboards and alerts. Tested nightly under failures.</p></a>
-				<a href={`${DOCS}/operations/bare-metal.md`}><h3>Hosts with systemd ↗</h3><p>Units for the members, the gateways and the backup, for machines without containers.</p></a>
+				<a href="/docs/deployment/kubernetes/"><h3>Kubernetes</h3><p>The Helm chart: members with their own volumes, RADIUS servers with their own addresses, the backup, dashboards and alerts. Tested nightly under failures.</p></a>
+				<a href={`${DOCS}/operations/bare-metal.md`}><h3>Hosts with systemd ↗</h3><p>Units for the members, the RADIUS servers and the backup, for machines without containers.</p></a>
 				<a href={`${DOCS}/operations/aws-ecs.md`}><h3>Amazon ECS ↗</h3><p>Example CloudFormation and Terraform templates on Graviton — validated, not yet deployed by the project.</p></a>
 			</div>
 		</section>

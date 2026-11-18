@@ -10,15 +10,15 @@
 	<div class="link" aria-hidden="true">↓ UDP · RadSec · DTLS · TCP</div>
 
 	<div class="row two">
-		<div class="node"><strong>Gateway A</strong><small>validate · authenticate</small></div>
-		<div class="node"><strong>Gateway B</strong><small>validate · authenticate</small></div>
+		<div class="node"><strong>RADIUS server A</strong><small>validate · authenticate</small></div>
+		<div class="node"><strong>RADIUS server B</strong><small>validate · authenticate</small></div>
 	</div>
 
 	<div class="row split">
 		<div class="path">
 			<div class="link" aria-hidden="true">↙ authentication</div>
 			<div class="node plain"><strong>Identity stores</strong><small>users file · SQL · LDAP/AD · Netlogon · home servers</small></div>
-			<p class="note">Decided on the gateway; keeps working without a cluster majority, except shared-state features.</p>
+			<p class="note">Decided on the RADIUS server; keeps working without a cluster majority, except shared-state features.</p>
 		</div>
 		<div class="path">
 			<div class="link" aria-hidden="true">↘ accounting</div>
