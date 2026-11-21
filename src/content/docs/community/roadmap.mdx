@@ -4,8 +4,8 @@ description: "What radiusward has done so far, what comes next, what is being ev
 source: "docs/plans/roadmap.md"
 ---
 
-radiusward was built in phases, each with a plan and a report in the server repository. The first release candidate,
-`v0.1.0-rc.1`, was tagged in November 2026.
+radiusward was built in phases, each with a plan and a report in the server repository. The release candidates
+`v0.1.0-rc.1` and `v0.1.0-rc.2` were tagged in November 2026.
 
 ## Done
 
@@ -17,10 +17,12 @@ radiusward was built in phases, each with a plan and a report in the server repo
 | **Deployment** | the Helm chart with nightly chaos tests, systemd units, dashboards and alert rules, seeding of a replaced member, a continuous backup with restore after a lost quorum, example templates for Amazon ECS |
 | **Authentication** | PAP, CHAP, MS-CHAP, EAP-TLS, PEAP, TTLS, TEAP, EAP-pwd, EAP-SIM/AKA/AKA′ with local keys; users file, SQL, LDAP/Active Directory, Netlogon; policy, Simultaneous-Use through the cluster, address pools, TOTP; RadSec, DTLS, TCP; proxying; CoA and Disconnect |
 | **Evidence** | published test reports with history, weekly benchmarks with published pages |
+| **Libraries for developers** | radiusward embedded in a JVM for tests (one member or three, failover controls, a throwaway CA, SIM users, CoA), a JUnit extension, a RADIUS client with an EAP supplicant for every method, plug-in interfaces for stores and sinks, all on GitHub Packages with a BOM |
 
 ## Next
 
-- **A stable 0.1.0 release**, after the release candidate has been exercised.
+- **A stable 0.1.0 release**, after the release candidates have been exercised.
+- **Maven Central** for the libraries' releases, so they need no token.
 - **More export destinations**: further relational databases and a message stream, behind the same sink interface.
 - **Benchmarks on dedicated machines** (Amazon ECS, per profile), so the ceilings per profile are measured rather
   than bounded from below.

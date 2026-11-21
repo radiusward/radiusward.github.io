@@ -10,7 +10,7 @@ that nothing acknowledged was lost.
 
 <Callout type="caution" title="A local evaluation, not a production template">
 The stack uses demo secrets and demo users, listens on your machine only, and keeps its data in Docker volumes. Every
-command below was run as written against release `v0.1.0-rc.1`.
+command below was run as written against release `v0.1.0-rc.2`.
 </Callout>
 
 ## 1. Prerequisites
@@ -25,9 +25,9 @@ command below was run as written against release `v0.1.0-rc.1`.
 ## 2. Get the Compose stack
 
 ```bash
-git clone --depth 1 --branch v0.1.0-rc.1 https://github.com/radiusward/radiusward-server.git
+git clone --depth 1 --branch v0.1.0-rc.2 https://github.com/radiusward/radiusward-server.git
 cd radiusward-server
-export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.2
 ```
 
 `RADIUSWARD_IMAGE` makes Compose pull the released image from GitHub's registry instead of expecting a locally

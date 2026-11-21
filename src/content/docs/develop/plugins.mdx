@@ -1,0 +1,137 @@
+---
+title: "Plug in your own code"
+description: "Let radiusward look users up in your own directory, check passwords with your own service, and send committed accounting to your own billing or data store — with the same classes in a test and as plug-ins in a production cluster."
+source: "auth-api/README.md"
+---
+
+radiusward does the RADIUS work — the protocols, the cryptography, EAP, check items, replies, the commit — and leaves two
+things to you if you want them: **where users come from** and **where accounting goes**. Both are small Java interfaces.
+A class you write against them runs in a test with the embedded server and, unchanged, as a plug-in in a cluster.
+
+## Your user directory
+
+An identity store answers one question: who is this user? It returns their password or password hash, check items,
+groups and reply attributes; radiusward verifies the credential and builds the reply.
+
+```java
+public final class DirectoryStore implements IdentityStore {
+
+    @Override
+    public Optional<UserRecord> lookup(String userName) throws StoreUnavailableException {
+        return directory.find(userName).map(u -> new UserRecord(
+                userName,
+                List.of(new AttributeItem("Cleartext-Password", ":=", u.password())),
+                List.of(new AttributeItem("Class", ":=", u.plan())),
+                List.of()));
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+Empty means "unknown user": a reject. A `StoreUnavailableException` means "cannot tell now": the request is left
+unanswered, so the NAS tries again or another server — an outage never turns into an Accept or a Reject. Lookups come
+from several threads at once.
+
+Users without a password of their own — accounts in an LDAP directory or Active Directory — are checked by a
+**credential verifier**, which takes the PAP password or the MS-CHAP response to the system that knows it:
+
+```java
+public final class PasswordService implements CredentialVerifier {
+
+    @Override
+    public Result verifyPassword(String userName, byte[] password) throws StoreUnavailableException {
+        return service.check(userName, password) ? Result.accepted(null) : Result.REJECTED;
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+## Your accounting store
+
+A sink receives what the cluster committed, in commit order: batches of accounting events and the latest state of each
+session. The exporter around it does the hard parts — reading only committed records, batching, retries, the lease that
+lets one member write while the others stand by, checkpoints, lag.
+
+```java
+public final class BillingSink implements AccountingSink {
+
+    @Override
+    public void open(SinkContext context) {
+        billing = Billing.connect(context.setting("url", "http://localhost:8080"));
+    }
+
+    @Override
+    public CheckpointStyle checkpointStyle() {
+        return CheckpointStyle.IDEMPOTENT_REPLAY;        // the last batch may come again after a restart
+    }
+
+    @Override
+    public long storedPosition() {
+        return billing.position();                       // -1 the first time
+    }
+
+    @Override
+    public void write(Batch batch) {                     // durable when it returns
+        batch.sessions().forEach(billing::upsertIfNewer);
+        billing.storePosition(batch.toPosition());
+    }
+
+    @Override
+    public void close() {
+        billing.close();
+    }
+}
+```
+
+Two rules make a sink correct when a batch is delivered again — after a crash or when another member takes over:
+**insert events only if absent** (by `eventId`) and **update a session only if newer** (by `projectionVersion`).
+[Writing a sink](https://github.com/radiusward/radiusward-server/blob/main/docs/sinks/writing-a-sink.md) has the whole
+contract and how common databases and queues map to it.
+
+## In a test
+
+```java
+@RegisterExtension
+static RadiuswardExtension radius = RadiuswardExtension.configure(b -> b
+        .identityStore(new DirectoryStore(testDirectory))
+        .credentialVerifier(new PasswordService(fakeService))
+        .sink(new BillingSink()));
+```
+
+The embedded server asks your store after any `user(...)` you added, uses your verifier for the users of your store
+that have no password, and runs your sink beside its own. Your instances are closed once, when the server closes. For a
+sink in a test, `AccountingSink.of(batch -> ...)` makes one from a function.
+
+## In a production cluster
+
+Package the class with a provider, register it with Java's service loader, and drop the jar into the plug-in
+directory:
+
+```java
+public final class DirectoryStoreProvider implements IdentityStoreProvider {
+    public String type() { return "directory"; }                          // auth.store.<name>.type
+    public IdentityStore create(StoreContext context) {
+        return new DirectoryStore(new Directory(context.settings().get("url")));
+    }
+}
+```
+
+```properties
+# META-INF/services/io.radiusward.auth.IdentityStoreProvider: com.example.DirectoryStoreProvider
+auth.plugins.dir = /opt/radiusward/plugins
+auth.stores = staff
+auth.store.staff.type = directory
+auth.store.staff.url = ldaps://directory.example.net
+```
+
+A sink works the same way: a `SinkProvider` in `META-INF/services/io.radiusward.export.SinkProvider`, the jar in
+`export.plugins.dir`, and `export.sinks` naming it. Build plug-ins against `radiusward-auth-api` or
+`radiusward-export-api` with `provided` scope: the server brings them.
+
+Built-in stores (a users file, SQL, LDAP and Active Directory, Netlogon) and sinks (files, PostgreSQL, forwarding to
+another RADIUS server) need no code at all; the [configuration reference](https://github.com/radiusward/radiusward-server/blob/main/docs/configuration.md#identity-stores)
+lists their settings.

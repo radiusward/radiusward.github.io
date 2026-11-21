@@ -1,0 +1,105 @@
+---
+title: "Test EAP logins"
+description: "Log in from a test the way a laptop, a phone or a SIM device does: PEAP, TTLS, TEAP, EAP-TLS with client certificates from a throwaway CA, EAP-pwd, and EAP-SIM, EAP-AKA and EAP-AKA′ with simulated SIM cards; check reply attributes and the keys an access point gets."
+source: "client/README.md"
+---
+
+A NAS only relays EAP; what decides a Wi-Fi or 802.1X login is the conversation between the device and the server.
+`radiusward-client` has the device's side for every method radiusward speaks, so a test runs whole EAP logins against
+the embedded server — or against any RADIUS server — and checks how they end.
+
+## PEAP, TTLS and TEAP with a throwaway CA
+
+Turn the methods on, and the embedded server makes a CA for the test, valid for a day, and signs its own certificate
+with it. The device trusts that CA:
+
+```java
+@Radiusward(users = "alice:secret", eap = {"peap", "ttls", "teap"})
+class WifiLoginTest {
+
+    @Test
+    void peap(EmbeddedRadiusward radius, RadiusClient nas) {
+        EapResult r = nas.eap(EapLogin.peap("alice", "secret")      // MS-CHAPv2 inside; .inner(Inner.GTC)
+                .trust(radius.ca())
+                .outerIdentity("anonymous@example.org"));
+        assertThat(r.accepted()).isTrue();
+        assertThat(r.cryptoBound()).isTrue();                        // PEAP's crypto-binding checked and answered
+        assertThat(r.msk().orElseThrow())                             // the keys the access point gets
+                .isEqualTo(r.serverMsk().orElseThrow());
+    }
+
+    @Test
+    void wrongPassword(EmbeddedRadiusward radius, RadiusClient nas) {
+        assertThat(nas.eap(EapLogin.ttls("alice", "wrong").trust(radius.ca())).rejected()).isTrue();
+    }
+}
+```
+
+`EapResult` tells how the login ended (accepted, rejected or no answer), how many rounds it took, the Access-Accept's
+attributes (`r.response()`), the keys the device derived and the keys the server gave the NAS, and what the device
+checked of the server: MS-CHAPv2's proof (`serverProved()`) and the crypto-binding (`cryptoBound()`). A device that does
+not trust the server certificate stops, as a real one does.
+
+| Login | Method |
+|---|---|
+| `EapLogin.peap(user, password)` | PEAPv0 with MS-CHAPv2 or GTC inside, crypto-binding answered |
+| `EapLogin.ttls(user, password)` | EAP-TTLS with PAP, CHAP, MS-CHAP or MS-CHAPv2 inside |
+| `EapLogin.teap(user, password)` | TEAP with Basic-Password-Auth or an inner EAP-GTC, every crypto-binding checked |
+| `EapLogin.tls(identity, key, certificate)` | EAP-TLS with a client certificate |
+| `EapLogin.pwd(user, password)` | EAP-pwd: a password without a certificate; the device checks the server's proof first |
+| `EapLogin.md5(user, password)` | EAP-MD5 |
+| `EapLogin.sim(card)`, `aka(card)`, `akaPrime(card)` | EAP-SIM, EAP-AKA and EAP-AKA′ with a simulated SIM card |
+
+TLS 1.2 or 1.3 (`tlsProtocol(...)`), and the fragment size (`fragmentSize(...)`) can be set per login, to test what a
+particular device does.
+
+## EAP-TLS with client certificates
+
+The same throwaway CA signs client certificates on request:
+
+```java
+@Radiusward(eap = "tls")
+class CertificateLoginTest {
+
+    @Test
+    void laptop(EmbeddedRadiusward radius, RadiusClient nas) {
+        ClientCertificate laptop = radius.clientCertificate("laptop-1");
+        EapResult r = nas.eap(EapLogin.tls("laptop-1", laptop.key(), laptop.certificate()).trust(radius.ca()));
+        assertThat(r.accepted()).isTrue();
+    }
+}
+```
+
+With your own PKI instead, set `auth.eap.tls.certificate`, `auth.eap.tls.key` and `auth.eap.tls.ca` as settings; the
+throwaway CA is then not made.
+
+## SIM cards
+
+For private LTE and 5G networks that authenticate Wi-Fi with SIM cards: a subscriber is an IMSI with its key Ki and the
+operator's OPc, and the device side is a simulated SIM card with the same values:
+
+```java
+@RegisterExtension
+static RadiuswardExtension radius = RadiuswardExtension.configure(b -> b
+        .eap("aka", "aka-prime", "sim")
+        .simUser("262011000000001", KI, OPC));
+
+@Test
+void aka(RadiusClient nas) {
+    SimCard card = new SimCard("262011000000001", KI, OPC);
+    assertThat(nas.eap(EapLogin.aka(card)).accepted()).isTrue();
+    long sqn = card.sqn();
+    assertThat(nas.eap(EapLogin.akaPrime(card)).accepted()).isTrue();
+    assertThat(card.sqn()).isGreaterThan(sqn);           // a fresh sequence number from the cluster
+}
+```
+
+Like a real USIM, the card remembers the highest sequence number it accepted: reuse it across logins to see fresh ones,
+or set `sqn(...)` ahead of the network to see the resynchronisation. A card that does not trust the network answers
+with an Authentication-Reject, so the login ends rejected.
+
+## Against another server
+
+`radiusward-client` is an ordinary RADIUS client: `RadiusClient.udp("radius.example.net", 1812, "secret")` runs the same
+logins against a staging cluster or any other RADIUS server. Every class and option is in the
+[client's reference](https://github.com/radiusward/radiusward-server/blob/main/client/README.md).

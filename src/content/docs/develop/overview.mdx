@@ -1,0 +1,115 @@
+---
+title: "Develop with radiusward"
+description: "Test a NAS, a captive portal, a billing system or any application that speaks RADIUS against real radiusward inside your own JVM, log in with every EAP method from a test, and plug in your own user directory and accounting store. What is available, what is a stable API, and how to get the jars."
+source: "README.md"
+---
+
+radiusward is a server you run, and also a set of libraries for the people who build things around RADIUS: a NAS or
+access point, a captive portal, a billing or quota system, a self-service portal, an identity backend. With one test
+dependency you start a real radiusward inside your test's JVM — one cluster member and one RADIUS server, or a cluster
+of three — send it logins and accounting from the test, and check what it decided and what it committed.
+
+<Callout type="note" title="For development and tests, not for production">
+The embedded server keeps everything on one machine and syncs nothing to disk; it says so in its log when it starts.
+Production is the cluster described in the rest of this documentation.
+</Callout>
+
+## What you can use
+
+| Artifact | For |
+|---|---|
+| `radiusward-junit` | a JUnit extension: an embedded server per test class or test, the server and ready clients as test parameters |
+| `radiusward-embedded` | the embedded server itself, for other test frameworks or a local development server |
+| `radiusward-client` | a RADIUS client that acts as a NAS and its devices: PAP, CHAP, MS-CHAPv2, an EAP supplicant for every method, accounting, Status-Server, CoA; it works against any RADIUS server |
+| `radiusward-auth-api` | the interfaces for your own identity store or password verifier |
+| `radiusward-export-api` | the interfaces for your own accounting sink |
+| `radiusward-bom` | the versions of all of them, imported once |
+
+These six are the **public API**: kept compatible within a minor version (until 1.0, a minor version may change them,
+with a note in the release). Everything else is published only because they depend on it and may change in any
+release.
+
+## Get the jars
+
+Import the BOM once, then add what you need without versions:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.radiusward</groupId>
+            <artifactId>radiusward-bom</artifactId>
+            <version>0.1.0-rc.2</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>io.radiusward</groupId>
+        <artifactId>radiusward-junit</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+With Gradle: `testImplementation(platform("io.radiusward:radiusward-bom:0.1.0-rc.2"))` and then the artifacts without a
+version.
+
+The packages are on **GitHub Packages**, which asks for a token even for public packages: create a personal access
+token (classic) with the `read:packages` scope, and put it with the repository in `~/.m2/settings.xml`:
+
+```xml
+<settings>
+  <servers>
+    <server><id>github</id><username>YOUR_GITHUB_USER</username><password>YOUR_TOKEN</password></server>
+  </servers>
+  <profiles>
+    <profile>
+      <id>radiusward</id>
+      <repositories>
+        <repository>
+          <id>github</id>
+          <url>https://maven.pkg.github.com/radiusward/radiusward-server</url>
+          <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+  <activeProfiles><activeProfile>radiusward</activeProfile></activeProfiles>
+</settings>
+```
+
+Releases will also be on Maven Central, without any token. Snapshots of the main branch are `0.1.0-SNAPSHOT`.
+
+## Requirements
+
+- **Java 25.**
+- The JVM option `--add-exports java.base/jdk.internal.misc=ALL-UNNAMED`, because radiusward's buffers and cluster use
+  it. With Maven, in Surefire's (and Failsafe's) configuration:
+
+  ```xml
+  <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-surefire-plugin</artifactId>
+      <configuration>
+          <argLine>--add-exports java.base/jdk.internal.misc=ALL-UNNAMED</argLine>
+      </configuration>
+  </plugin>
+  ```
+
+  With Gradle: `tasks.test { jvmArgs("--add-exports", "java.base/jdk.internal.misc=ALL-UNNAMED") }`. When the option is
+  missing, the embedded server stops at start with a message that names it.
+
+## Next
+
+<Cards>
+<Card title="Test your NAS or application" href="/docs/develop/testing/">Logins, accounting from Start to Stop, what the cluster committed, a paused cluster and failover — from a JUnit test.</Card>
+<Card title="Test EAP logins" href="/docs/develop/eap/">PEAP, TTLS, TEAP, EAP-TLS, EAP-pwd, EAP-SIM, EAP-AKA and EAP-AKA′ with a throwaway CA and simulated SIM cards.</Card>
+<Card title="Plug in your own code" href="/docs/develop/plugins/">Your user directory and your accounting store, the same classes in tests and in a production cluster.</Card>
+</Cards>
+
+A complete Maven project that does all of this is in the server repository:
+[testing/embedded-consumer](https://github.com/radiusward/radiusward-server/tree/main/testing/embedded-consumer).

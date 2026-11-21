@@ -9,11 +9,11 @@ source: "docs/operations/docker.md"
 One image for every component — members, RADIUS servers, backup and the tools:
 
 ```text
-ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+ghcr.io/radiusward/radiusward-server:0.1.0-rc.2
 ```
 
 It is public, built for amd64 and arm64, runs as a non-root user, and ships with an SBOM and build provenance.
-`docker run --rm ghcr.io/radiusward/radiusward-server:0.1.0-rc.1 version` prints the version. The subcommands are
+`docker run --rm ghcr.io/radiusward/radiusward-server:0.1.0-rc.2 version` prints the version. The subcommands are
 `cluster-node`, `server`, `cluster-backup`, `cluster-restore`, `radclient`, `admin`, `probe` and `cluster-tool`.
 
 ## The Compose stack
@@ -23,7 +23,7 @@ RADIUS servers and PostgreSQL as the export destination, on one machine. The [qu
 through it; the short form:
 
 ```bash
-export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.1
+export RADIUSWARD_IMAGE=ghcr.io/radiusward/radiusward-server:0.1.0-rc.2
 docker compose -f deploy/compose/compose.yaml up -d --wait
 docker compose -f deploy/compose/compose.yaml down -v      # -v deletes the data volumes
 ```

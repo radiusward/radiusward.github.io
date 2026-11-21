@@ -27,6 +27,15 @@ export const DOCS_NAV: { label: string; items: Item[] }[] = [
 	},
 	{ label: 'Authentication', items: [{ slug: 'authentication/choosing-a-method', label: 'Choosing a method' }] },
 	{
+		label: 'Develop',
+		items: [
+			{ slug: 'develop/overview', label: 'Develop with radiusward' },
+			{ slug: 'develop/testing', label: 'Test your NAS or application' },
+			{ slug: 'develop/eap', label: 'Test EAP logins' },
+			{ slug: 'develop/plugins', label: 'Plug in your own code' },
+		],
+	},
+	{
 		label: 'Deployment',
 		items: [
 			{ slug: 'deployment/docker', label: 'Docker' },

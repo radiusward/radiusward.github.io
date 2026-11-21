@@ -1,7 +1,7 @@
 ---
 // Copyright 2026 The radiusward Authors
 // SPDX-License-Identifier: Apache-2.0
-// The documentation front page: three ways in by what the reader wants, then every section.
+// The documentation front page: four ways in by what the reader wants, then every section.
 import Base from '../../layouts/Base.astro';
 import { getCollection } from 'astro:content';
 import { DOCS_NAV } from '../../nav';
@@ -11,6 +11,7 @@ const about: Record<string, string> = {
 	Concepts: 'How the parts fit together, and why.',
 	Reliability: 'What a confirmation guarantees, what happens when something fails, and the evidence.',
 	Authentication: 'From the credentials and clients you have to the method that fits.',
+	Develop: 'radiusward inside your tests: logins, accounting, EAP and failover against a real server, and your own stores and sinks.',
 	Deployment: 'Docker for an evaluation; Kubernetes for production.',
 	Operate: 'Signals to watch, recovery to practise, upgrades, and a checklist before production.',
 	Security: 'Reporting, defaults, hardening, and the limits stated openly.',
@@ -45,9 +46,18 @@ const paths = [
 			{ label: 'Evidence: tests and benchmarks', href: '/docs/reliability/evidence/' },
 		],
 	},
+	{
+		title: 'I want to build on it',
+		text: 'A real radiusward inside your JUnit tests for your NAS, portal or billing code, every EAP method from the device side, and your own user directory and accounting store.',
+		links: [
+			{ label: 'Develop with radiusward', href: '/docs/develop/overview/' },
+			{ label: 'Test your NAS or application', href: '/docs/develop/testing/' },
+			{ label: 'Plug in your own code', href: '/docs/develop/plugins/' },
+		],
+	},
 ];
 ---
-<Base title="Documentation" description="radiusward documentation: what it is, how to run it on Docker and Kubernetes, which authentication method fits your clients, what a confirmation guarantees, how to operate and secure it, and how to contribute." section="docs">
+<Base title="Documentation" description="radiusward documentation: what it is, how to run it on Docker and Kubernetes, which authentication method fits your clients, what a confirmation guarantees, how to operate and secure it, how to test against it and extend it, and how to contribute." section="docs">
 	<div class="container page">
 		<span class="eyebrow">Documentation</span>
 		<h1>Everything you need to evaluate, run and operate radiusward.</h1>
@@ -58,7 +68,7 @@ const paths = [
 
 		<section class="paths">
 			<h2>Start here</h2>
-			<div class="three">
+			<div class="ways">
 				{paths.map((p) => (
 					<article>
 						<h3>{p.title}</h3>
@@ -95,13 +105,13 @@ const paths = [
 	.paths { margin-top: var(--space-12); }
 	.paths h2, .all { font-size: var(--text-xl); margin-bottom: var(--space-5); }
 	.all { margin-top: var(--space-16); }
-	.three { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
-	.three article { padding: var(--space-5) var(--space-6); border: 1px solid var(--color-border); border-top: 4px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-surface); }
-	.three h3 { font-size: var(--text-lg); }
-	.three p { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
-	.three ol { margin: var(--space-4) 0 0; padding-left: var(--space-5); font-size: var(--text-sm); }
-	.three li + li { margin-top: var(--space-2); }
-	.three ol a { color: var(--color-primary); font-weight: 700; }
+	.ways { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.ways article { padding: var(--space-5) var(--space-6); border: 1px solid var(--color-border); border-top: 4px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-surface); }
+	.ways h3 { font-size: var(--text-lg); }
+	.ways p { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+	.ways ol { margin: var(--space-4) 0 0; padding-left: var(--space-5); font-size: var(--text-sm); }
+	.ways li + li { margin-top: var(--space-2); }
+	.ways ol a { color: var(--color-primary); font-weight: 700; }
 	.group { display: grid; grid-template-columns: 240px 1fr; gap: var(--space-8); padding-block: var(--space-8); border-top: 1px solid var(--color-divider); }
 	.group h3 { font-size: var(--text-lg); }
 	.group-head p { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
@@ -109,5 +119,5 @@ const paths = [
 	.grid a { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
 	.grid a:hover { border-color: var(--color-primary); }
 	.grid span { color: var(--color-text-muted); font-size: var(--text-sm); }
-	@media (max-width: 760px) { .group { grid-template-columns: 1fr; gap: var(--space-4); } }
+	@media (max-width: 760px) { .group { grid-template-columns: 1fr; gap: var(--space-4); } .ways { grid-template-columns: 1fr; } }
 </style>

@@ -6,5 +6,5 @@ export const REPO = 'https://github.com/radiusward/radiusward-server';
 export const DOCS = `${REPO}/blob/main/docs`;
 /** The test reports and benchmarks published by the server repo (moves with the domain, decision D2). */
 export const REPORTS = 'https://radiusward.github.io/radiusward-server';
-export const RELEASE = { tag: 'v0.1.0-rc.1', label: 'Release candidate', date: '2026-11-11' };
+export const RELEASE = { tag: 'v0.1.0-rc.2', label: 'Release candidate', date: '2026-11-20' };
 export const RELEASE_URL = `${REPO}/releases/tag/${RELEASE.tag}`;

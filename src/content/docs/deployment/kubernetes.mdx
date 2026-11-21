@@ -10,7 +10,7 @@ load while the leader is killed, members and RADIUS servers are rolled, a volume
 ## Install
 
 ```bash
-helm install radiusward oci://ghcr.io/radiusward/charts/radiusward --version 0.1.0-rc.1 \
+helm install radiusward oci://ghcr.io/radiusward/charts/radiusward --version 0.1.0-rc.2 \
     -n radius --create-namespace -f my-values.yaml
 kubectl -n radius get pods -l app.kubernetes.io/instance=radiusward
 kubectl -n radius exec radiusward-node-0 -- radiusward probe http://127.0.0.1:9090/ready

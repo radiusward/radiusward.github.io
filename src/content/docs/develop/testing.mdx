@@ -1,0 +1,126 @@
+---
+title: "Test your NAS or application"
+description: "Start a real radiusward in a JUnit test, send logins and a session's accounting from Start to Stop, check what the cluster committed and what a sink received, see what happens without acknowledgements, and stop the leader of a three-member cluster."
+source: "junit/README.md"
+---
+
+Your code talks RADIUS — a NAS, a portal that sends logins, a service that reads accounting. To test it, you need a
+server that behaves like the real one: one that acknowledges accounting only after it is committed, counts a
+retransmission once, and sometimes does not answer. `radiusward-junit` starts that server inside your test and closes it
+afterwards, also when a test fails. (How to add the dependency and the JVM option: [Develop with radiusward](/docs/develop/overview/).)
+
+## A login
+
+```java
+@Radiusward(users = "alice:secret")                    // one server for this class
+class LoginTest {
+
+    @Test
+    void aliceLogsIn(RadiusClient nas) {                // a client of the Access-Request port
+        Response accept = nas.pap("alice", "secret").orElseThrow();
+        assertThat(accept.isAccept()).isTrue();
+        assertThat(nas.pap("alice", "wrong").orElseThrow().isReject()).isTrue();
+        assertThat(nas.msChapV2("alice", "secret").orElseThrow().isAccept()).isTrue();
+    }
+}
+```
+
+The test asks for what it needs as parameters: a `RadiusClient` for logins, a `@Accounting RadiusClient` for accounting,
+and `EmbeddedRadiusward` for everything the server knows. By default one server serves all tests of a class (it starts in
+about a second); `@Radiusward(lifecycle = Radiusward.Lifecycle.PER_TEST)` gives every test a fresh one. Test classes that JUnit runs in
+parallel each get their own server and ports.
+
+The annotation takes users (`name:password`), EAP methods, the number of cluster members and RADIUS servers, and any
+setting as `key=value`, for example `settings = "auth.reject.delay=1s"`. Users get reply attributes in code:
+`user("alice", "secret", "Class := gold")` (below).
+
+## A session from Start to Stop
+
+```java
+@Test
+void aSession(EmbeddedRadiusward radius, @Accounting RadiusClient nas) {
+    AccountingSession s = new AccountingSession("s-1").user("alice").callingStationId("aa-bb-cc-dd-ee-ff");
+    assertThat(nas.send(s.start()).orElseThrow().isAcknowledgement()).isTrue();
+
+    AccountingEvent interim = s.interim(Duration.ofMinutes(5), 1_000_000, 4_000_000);
+    nas.send(interim);
+    nas.send(interim.delay(3));                          // the NAS sends it again: counted once
+    nas.send(s.stop(Duration.ofMinutes(10), 2_000_000, 8_000_000, TerminateCause.USER_REQUEST));
+
+    assertThat(radius.awaitAccounting(3))               // what every sink received, in commit order
+            .extracting(ExportEvent::statusType)
+            .containsExactly(1, 3, 2);
+    Session session = radius.session("s-1").orElseThrow();   // what the cluster holds
+    assertThat(session.active()).isFalse();
+    assertThat(session.sessionTime()).isEqualTo(Duration.ofMinutes(10));
+    assertThat(radius.activeSessions("alice")).isEmpty();
+}
+```
+
+Each acknowledgement means the record is committed; the resent Interim-Update is recognised and applied once, as
+[the accounting contract](/docs/reliability/accounting-contract/) promises. `session(...)` and `activeSessions(...)` read
+the replicated state, the same state every cluster member holds.
+
+## Without acknowledgements
+
+A NAS has to keep accounting records and send them again while the server does not answer. Test that:
+
+```java
+@Test
+void theNasResends(EmbeddedRadiusward radius) {
+    AccountingEvent start = new AccountingSession("s-2").user("bob").start();
+    radius.pauseCluster();                               // no commit, so no Accounting-Response
+    try (RadiusClient quick = radius.accountingClient().timeout(Duration.ofMillis(300)).retries(0)) {
+        assertThat(quick.send(start)).isEmpty();
+    }
+    radius.resumeCluster();
+    try (RadiusClient nas = radius.accountingClient()) {
+        assertThat(nas.send(start).orElseThrow().isAcknowledgement()).isTrue();
+    }
+    assertThat(radius.awaitAccounting(1)).hasSize(1);   // applied once
+}
+```
+
+## Failover with three members
+
+```java
+@Radiusward(members = 3, radiusServers = 2)
+class FailoverTest {
+
+    @Test
+    void oneMemberDown(EmbeddedRadiusward radius) {
+        radius.stopLeader();                             // the other two elect a new leader
+        try (RadiusClient nas = radius.accountingClient(1)) {
+            assertThat(nas.send(new AccountingSession("s-3").start()).orElseThrow().isAcknowledgement()).isTrue();
+        }
+    }
+}
+```
+
+`stopMember(i)`, `startMember(i)`, `stopServer(i)` and `startServer(i)` (back on the same ports) give finer control.
+With two of three members stopped, nothing is acknowledged until one is back. Members in one JVM stop by closing; how
+radiusward behaves when a member crashes or loses power is covered by the
+[failure behaviour](/docs/reliability/failure-behaviour/) tests, which kill real processes.
+
+## More of what the server offers
+
+| From the test | |
+|---|---|
+| `radius.coa(user, "Session-Timeout = 600")`, `radius.disconnect(user)` | CoA and Disconnect-Requests to the NAS of each of the user's sessions; a `CoaListener` from `radiusward-client` plays the NAS (`coaPort(...)` on the builder) |
+| `radius.accounting()`, `onAccounting(event -> ...)` | every committed event, as a sink receives it |
+| `setting("export.sinks", "archive")` and `sink.archive.*` | a built-in sink, e.g. the file or PostgreSQL sink, beside the embedded server's own |
+| `radius.server()`, `radius.member()`, `radius.config()` | the RADIUS server, a cluster member and the settings, for everything else |
+
+Anything the builder offers — your own store, verifier or sink, SIM users, fixed ports — goes through the extension
+registered in code; a `static` field gives one server per class, an instance field one per test:
+
+```java
+@RegisterExtension
+static RadiuswardExtension radius = RadiuswardExtension.configure(b -> b
+        .user("alice", "secret", "Class := gold")
+        .identityStore(new MyUsers())
+        .sink(new MyBillingSink()));
+```
+
+Without JUnit, `EmbeddedRadiusward.builder()…start()` gives the same server; close it when you are done. Every method is
+in the [embedded server's reference](https://github.com/radiusward/radiusward-server/blob/main/embedded/README.md).
